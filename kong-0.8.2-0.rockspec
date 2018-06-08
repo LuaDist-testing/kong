@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.8.1-0"
+version = "0.8.2-0"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.8.1-0",
+  tag = "0.8.2-0",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.8.1"
+--   tag = "0.8.2"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -22,6 +22,7 @@ dependencies = {
   "luasec ~> 0.5-2",
 
   "penlight ~> 1.3.2",
+  "lua-resty-http ~> 0.07-0",
   "lua_uuid ~> 0.2.0-2",
   "lua_system_constants ~> 0.1.1-0",
   "luatz ~> 0.3-1",
@@ -52,7 +53,6 @@ build = {
 
     ["classic"] = "kong/vendor/classic.lua",
     ["lapp"] = "kong/vendor/lapp.lua",
-    ["resty_http"] = "kong/vendor/resty_http.lua",
 
     ["kong.meta"] = "kong/meta.lua",
     ["kong.constants"] = "kong/constants.lua",
@@ -157,7 +157,6 @@ build = {
     ["kong.plugins.oauth2.api"] = "kong/plugins/oauth2/api.lua",
 
     ["kong.plugins.log-serializers.basic"] = "kong/plugins/log-serializers/basic.lua",
-    ["kong.plugins.log-serializers.alf"] = "kong/plugins/log-serializers/alf.lua",
     ["kong.plugins.log-serializers.runscope"] = "kong/plugins/log-serializers/runscope.lua",
 
     ["kong.plugins.tcp-log.handler"] = "kong/plugins/tcp-log/handler.lua",
@@ -176,10 +175,12 @@ build = {
     ["kong.plugins.runscope.schema"] = "kong/plugins/runscope/schema.lua",
     ["kong.plugins.runscope.log"] = "kong/plugins/runscope/log.lua",
 
-    ["kong.plugins.mashape-analytics.migrations.cassandra"] = "kong/plugins/mashape-analytics/migrations/cassandra.lua",
-    ["kong.plugins.mashape-analytics.handler"] = "kong/plugins/mashape-analytics/handler.lua",
-    ["kong.plugins.mashape-analytics.schema"] = "kong/plugins/mashape-analytics/schema.lua",
-    ["kong.plugins.mashape-analytics.buffer"] = "kong/plugins/mashape-analytics/buffer.lua",
+    ["kong.plugins.galileo.migrations.cassandra"] = "kong/plugins/galileo/migrations/cassandra.lua",
+    ["kong.plugins.galileo.migrations.postgres"] = "kong/plugins/galileo/migrations/postgres.lua",
+    ["kong.plugins.galileo.handler"] = "kong/plugins/galileo/handler.lua",
+    ["kong.plugins.galileo.schema"] = "kong/plugins/galileo/schema.lua",
+    ["kong.plugins.galileo.buffer"] = "kong/plugins/galileo/buffer.lua",
+    ["kong.plugins.galileo.alf"] = "kong/plugins/galileo/alf.lua",
 
     ["kong.plugins.rate-limiting.migrations.cassandra"] = "kong/plugins/rate-limiting/migrations/cassandra.lua",
     ["kong.plugins.rate-limiting.migrations.postgres"] = "kong/plugins/rate-limiting/migrations/postgres.lua",
@@ -221,6 +222,8 @@ build = {
 
     ["kong.plugins.ip-restriction.handler"] = "kong/plugins/ip-restriction/handler.lua",
     ["kong.plugins.ip-restriction.schema"] = "kong/plugins/ip-restriction/schema.lua",
+    ["kong.plugins.ip-restriction.migrations.cassandra"] = "kong/plugins/ip-restriction/migrations/cassandra.lua",
+    ["kong.plugins.ip-restriction.migrations.postgres"] = "kong/plugins/ip-restriction/migrations/postgres.lua",
 
     ["kong.plugins.acl.migrations.cassandra"] = "kong/plugins/acl/migrations/cassandra.lua",
     ["kong.plugins.acl.migrations.postgres"] = "kong/plugins/acl/migrations/postgres.lua",
