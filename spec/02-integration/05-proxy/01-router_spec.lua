@@ -149,6 +149,52 @@ describe("Router", function()
     end)
   end)
 
+  describe("percent-encoded URIs", function()
+
+    setup(function()
+      insert_apis {
+        {
+          name = "api-1",
+          upstream_url = "http://httpbin.org",
+          uris = "/endel%C3%B8st",
+        },
+        {
+          name = "api-2",
+          upstream_url = "http://httpbin.org",
+          uris = "/foo/../bar",
+        },
+      }
+
+      assert(helpers.start_kong())
+    end)
+
+    teardown(function()
+      helpers.stop_kong()
+    end)
+
+    it("routes when [uris] is percent-encoded", function()
+      local res = assert(client:send {
+        method  = "GET",
+        path    = "/endel%C3%B8st",
+        headers = { ["kong-debug"] = 1 },
+      })
+
+      assert.res_status(200, res)
+      assert.equal("api-1", res.headers["kong-api-name"])
+    end)
+
+    it("matches against non-normalized URI", function()
+      local res = assert(client:send {
+        method  = "GET",
+        path    = "/foo/../bar",
+        headers = { ["kong-debug"] = 1 },
+      })
+
+      assert.res_status(200, res)
+      assert.equal("api-2", res.headers["kong-api-name"])
+    end)
+  end)
+
   describe("invalidation", function()
     local admin_client
 
@@ -250,6 +296,13 @@ describe("Router", function()
           upstream_url = "http://localhost:9999/headers-inspect",
           hosts = "discarded.com",
         },
+        {
+          name = "api-3",
+          strip_uri = false,
+          preserve_host = true,
+          upstream_url = "http://localhost:9999",
+          uris = "/headers-inspect",
+        }
       }
 
       assert(helpers.start_kong {
@@ -323,6 +376,18 @@ describe("Router", function()
         local json = cjson.decode(body)
         assert.equal("preserved.com:123", json.host)
       end)
+
+      it("forwards request Host even if not matched by [hosts]", function()
+        local res = assert(client:send {
+          method = "GET",
+          path = "/headers-inspect",
+          headers = { ["Host"] = "preserved.com" },
+        })
+
+        local body = assert.res_status(200, res)
+        local json = cjson.decode(body)
+        assert.equal("preserved.com", json.host)
+      end)
     end)
   end)
 
@@ -368,5 +433,116 @@ describe("Router", function()
       assert.response(res).has_status(200)
       assert.equal("fixture-api", res.headers["kong-api-name"])
     end)
+  end)
+
+  describe("trailing slash", function()
+    local checks = {
+      -- upstream url    uris            request path    expected path           strip uri
+      {  "/",            "/",            "/",            "/",                    nil       },
+      {  "/",            "/",            "/foo/bar",     "/foo/bar",             nil       },
+      {  "/",            "/",            "/foo/bar/",    "/foo/bar/",            nil       },
+      {  "/",            "/foo/bar",     "/foo/bar",     "/",                    nil       },
+      {  "/",            "/foo/bar/",    "/foo/bar/",    "/",                    nil       },
+      {  "/foo/bar",     "/",            "/",            "/foo/bar",             nil       },
+      {  "/foo/bar",     "/",            "/foo/bar",     "/foo/bar/foo/bar",     nil       },
+      {  "/foo/bar",     "/",            "/foo/bar/",    "/foo/bar/foo/bar/",    nil       },
+      {  "/foo/bar",     "/foo/bar",     "/foo/bar",     "/foo/bar",             nil       },
+      {  "/foo/bar",     "/foo/bar/",    "/foo/bar/",    "/foo/bar/",            nil       },
+      {  "/foo/bar/",    "/",            "/",            "/foo/bar/",            nil       },
+      {  "/foo/bar/",    "/",            "/foo/bar",     "/foo/bar/foo/bar",     nil       },
+      {  "/foo/bar/",    "/",            "/foo/bar/",    "/foo/bar/foo/bar/",    nil       },
+      {  "/foo/bar/",    "/foo/bar",     "/foo/bar",     "/foo/bar",             nil       },
+      {  "/foo/bar/",    "/foo/bar/",    "/foo/bar/",    "/foo/bar/",            nil       },
+      {  "/",            "/",            "/",            "/",                    true      },
+      {  "/",            "/",            "/foo/bar",     "/foo/bar",             true      },
+      {  "/",            "/",            "/foo/bar/",    "/foo/bar/",            true      },
+      {  "/",            "/foo/bar",     "/foo/bar",     "/",                    true      },
+      {  "/",            "/foo/bar/",    "/foo/bar/",    "/",                    true      },
+      {  "/foo/bar",     "/",            "/",            "/foo/bar",             true      },
+      {  "/foo/bar",     "/",            "/foo/bar",     "/foo/bar/foo/bar",     true      },
+      {  "/foo/bar",     "/",            "/foo/bar/",    "/foo/bar/foo/bar/",    true      },
+      {  "/foo/bar",     "/foo/bar",     "/foo/bar",     "/foo/bar",             true      },
+      {  "/foo/bar",     "/foo/bar/",    "/foo/bar/",    "/foo/bar/",            true      },
+      {  "/foo/bar/",    "/",            "/",            "/foo/bar/",            true      },
+      {  "/foo/bar/",    "/",            "/foo/bar",     "/foo/bar/foo/bar",     true      },
+      {  "/foo/bar/",    "/",            "/foo/bar/",    "/foo/bar/foo/bar/",    true      },
+      {  "/foo/bar/",    "/foo/bar",     "/foo/bar",     "/foo/bar",             true      },
+      {  "/foo/bar/",    "/foo/bar/",    "/foo/bar/",    "/foo/bar/",            true      },
+      {  "/",            "/",            "/",            "/",                    false     },
+      {  "/",            "/",            "/foo/bar",     "/foo/bar",             false     },
+      {  "/",            "/",            "/foo/bar/",    "/foo/bar/",            false     },
+      {  "/",            "/foo/bar",     "/foo/bar",     "/foo/bar",             false     },
+      {  "/",            "/foo/bar/",    "/foo/bar/",    "/foo/bar/",            false     },
+      {  "/foo/bar",     "/",            "/",            "/foo/bar",             false     },
+      {  "/foo/bar",     "/",            "/foo/bar",     "/foo/bar/foo/bar",     false     },
+      {  "/foo/bar",     "/",            "/foo/bar/",    "/foo/bar/foo/bar/",    false     },
+      {  "/foo/bar",     "/foo/bar",     "/foo/bar",     "/foo/bar/foo/bar",     false     },
+      {  "/foo/bar",     "/foo/bar/",    "/foo/bar/",    "/foo/bar/foo/bar/",    false     },
+      {  "/foo/bar/",    "/",            "/",            "/foo/bar/",            false     },
+      {  "/foo/bar/",    "/",            "/foo/bar",     "/foo/bar/foo/bar",     false     },
+      {  "/foo/bar/",    "/",            "/foo/bar/",    "/foo/bar/foo/bar/",    false     },
+      {  "/foo/bar/",    "/foo/bar",     "/foo/bar",     "/foo/bar/foo/bar",     false     },
+      {  "/foo/bar/",    "/foo/bar/",    "/foo/bar/",    "/foo/bar/foo/bar/",    false     },
+    }
+
+    setup(function()
+      helpers.dao:truncate_tables()
+
+      for i, args in ipairs(checks) do
+        assert(helpers.dao.apis:insert {
+            name         = "localbin-" .. i,
+            strip_uri    = args[5],
+            upstream_url = "http://localhost:9999" .. args[1],
+            uris         = {
+              args[2],
+            },
+            hosts        = {
+              "localbin-" .. i .. ".com",
+            },
+        })
+      end
+
+      assert(helpers.start_kong {
+        nginx_conf = "spec/fixtures/custom_nginx.template",
+      })
+    end)
+
+    teardown(function()
+      helpers.stop_kong()
+    end)
+
+    local function check(i, request_uri, expected_uri)
+      return function()
+        local res = assert(client:send {
+          method  = "GET",
+          path    = request_uri,
+          headers = {
+            ["Host"] = "localbin-" .. i .. ".com",
+          }
+        })
+
+        local json = assert.res_status(200, res)
+        local data = cjson.decode(json)
+
+        assert.equal(expected_uri, data.vars.request_uri)
+      end
+    end
+
+    for i, args in ipairs(checks) do
+
+      local config = "(strip_uri = n/a)"
+
+      if args[5] == true then
+        config = "(strip_uri = on) "
+
+      elseif args[5] == false then
+        config = "(strip_uri = off)"
+      end
+
+      it(config .. " is not appended to upstream url " .. args[1] ..
+                   " (with uri "                       .. args[2] .. ")" ..
+                   " when requesting "                 .. args[3],
+        check(i, args[3], args[4]))
+    end
   end)
 end)

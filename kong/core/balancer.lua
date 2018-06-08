@@ -255,7 +255,7 @@ local function execute(target)
 
   -- when tries == 0 it runs before the `balancer` context (in the `access` context),
   -- when tries >= 2 then it performs a retry in the `balancer` context
-  local dns_cache_only = target.tries ~= 0
+  local dns_cache_only = target.try_count ~= 0
   local balancer
 
   if dns_cache_only then
@@ -278,7 +278,7 @@ local function execute(target)
     -- have to invoke the ring-balancer
     local hashValue = nil  -- TODO: implement, nil does simple round-robin
 
-    local ip, port, hostname = balancer:getPeer(hashValue, dns_cache_only)
+    local ip, port, hostname = balancer:getPeer(hashValue, nil, dns_cache_only)
     if not ip then
       if port == "No peers are available" then
         -- in this case a "503 service unavailable", others will be a 500.

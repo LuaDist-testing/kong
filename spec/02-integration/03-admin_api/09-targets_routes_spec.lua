@@ -1,5 +1,5 @@
 local helpers = require "spec.helpers"
---local cjson = require "cjson"
+local cjson = require "cjson"
 
 local function it_content_types(title, fn)
   local test_form_encoded = fn("application/x-www-form-urlencoded")
@@ -105,7 +105,8 @@ describe("Admin API", function()
             headers = {["Content-Type"] = "application/json"}
           })
           local body = assert.response(res).has.status(400)
-          assert.equal('{"message":"Cannot parse JSON body"}', body)
+          local json = cjson.decode(body)
+          assert.same({ message = "Cannot parse JSON body" }, json)
         end)
         it_content_types("handles invalid input", function(content_type)
           return function()
@@ -119,7 +120,8 @@ describe("Admin API", function()
               headers = {["Content-Type"] = content_type}
             })
             local body = assert.response(res).has.status(400)
-            assert.equal([[{"target":"target is required"}]], body)
+            local json = cjson.decode(body)
+            assert.same({ target = "target is required" }, json)
 
             -- Invalid target parameter
             res = assert(client:send {
@@ -131,7 +133,8 @@ describe("Admin API", function()
               headers = {["Content-Type"] = content_type}
             })
             body = assert.response(res).has.status(400)
-            assert.equal([[{"message":"Invalid target; not a valid hostname or ip address"}]], body)
+            local json = cjson.decode(body)
+            assert.same({ message = "Invalid target; not a valid hostname or ip address" }, json)
             
             -- Invalid weight parameter
             res = assert(client:send {
@@ -144,7 +147,8 @@ describe("Admin API", function()
               headers = {["Content-Type"] = content_type}
             })
             body = assert.response(res).has.status(400)
-            assert.equal([[{"message":"weight must be from 0 to 1000"}]], body)
+            local json = cjson.decode(body)
+            assert.same({ message = "weight must be from 0 to 1000" }, json)
           end
         end)
         
@@ -223,7 +227,8 @@ describe("Admin API", function()
           query = {foo = "bar"},
         })
         local body = assert.response(res).has.status(400)
-        assert.equal([[{"foo":"unknown field"}]], body)
+        local json = cjson.decode(body)
+        assert.same({ foo = "unknown field" }, json)
       end)
       it("ignores an invalid body", function()
         local res = assert(client:send {
@@ -254,56 +259,44 @@ describe("Admin API", function()
             path = "/upstreams/"..upstream_name2.."/targets/",
           })
           local body = assert.response(res).has.status(200)
-          assert.equal([[{"data":[],"total":0}]], body)
+          local json = cjson.decode(body)
+          assert.same({ data = {}, total = 0 }, json)
         end)
       end)
     end)
   end)
 
   describe("/upstreams/{upstream}/targets/active/", function()
-    describe("only shows active targets", function()
+    describe("GET", function()
       local upstream_name3 = "example.com"
+      local apis = {}
 
       before_each(function()
         local upstream3 = assert(helpers.dao.upstreams:insert {
           name = upstream_name3,
         })
 
-        -- two target inserts, resulting in a 'down' target
-        assert(helpers.dao.targets:insert {
-          target = "api-1:80",
-          weight = 10,
-          upstream_id = upstream3.id,
-        })
-        assert(helpers.dao.targets:insert {
-          target = "api-1:80",
-          weight = 0,
-          upstream_id = upstream3.id,
-        })
+        -- testing various behaviors
+        -- for each index in weights, create a number of targets,
+        -- each with its weight as each element of the sub-array
+        local weights = {
+          { 10, 0 },        -- two targets, eventually resulting in down
+          { 10, 0, 10 },    -- three targets, eventually resulting in up
+          { 10 },           -- one target, up
+          { 10, 10 },       -- two targets, up (we should only see one)
+          { 10, 50, 0 },    -- three targets, two up in a row, eventually down
+          { 10, 0, 20, 0 }, -- four targets, eventually down
+        }
 
-        -- three target inserts, resulting in an 'up' target
-        assert(helpers.dao.targets:insert {
-          target = "api-2:80",
-          weight = 10,
-          upstream_id = upstream3.id,
-        })
-        assert(helpers.dao.targets:insert {
-          target = "api-2:80",
-          weight = 0,
-          upstream_id = upstream3.id,
-        })
-        assert(helpers.dao.targets:insert {
-          target = "api-2:80",
-          weight = 10,
-          upstream_id = upstream3.id,
-        })
-
-        -- and an insert of a separate active target
-        assert(helpers.dao.targets:insert {
-          target = "api-3:80",
-          weight = 10,
-          upstream_id = upstream3.id,
-        })
+        for i = 1, #weights do
+          for j = 1, #weights[i] do
+            apis[i] = assert(helpers.dao.targets:insert {
+              target = "api-" .. tostring(i) .. ":80",
+              weight = weights[i][j],
+              upstream_id = upstream3.id
+            })
+          end
+        end
       end)
 
       it("only shows active targets", function()
@@ -313,10 +306,18 @@ describe("Admin API", function()
         })
         assert.response(res).has.status(200)
         local json = assert.response(res).has.jsonbody()
-        assert.equal(2, #json.data)
-        assert.equal(2, json.total)
-        assert.equal("api-3:80", json.data[1].target)
-        assert.equal("api-2:80", json.data[2].target)
+
+        -- we got three active targets for this upstream
+        assert.equal(3, #json.data)
+        assert.equal(3, json.total)
+
+        -- when multiple active targets are present, we only see the last one
+        assert.equal(apis[4].id, json.data[1].id)
+
+        -- validate the remaining returned targets
+        -- note the backwards order, because we walked the targets backwards
+        assert.equal(apis[3].target, json.data[2].target)
+        assert.equal(apis[2].target, json.data[3].target)
       end)
     end)
   end)
@@ -345,10 +346,37 @@ describe("Admin API", function()
         })
       end)
 
-      it("acts as a sugar method to POST a target with 0 weight", function()
+      it("acts as a sugar method to POST a target with 0 weight (by target)", function()
         local res = assert(client:send {
           method = "DELETE",
           path = "/upstreams/" .. upstream_name4 .. "/targets/" .. target.target
+        })
+        assert.response(res).has.status(204)
+
+        local targets = assert(client:send {
+          method = "GET",
+          path = "/upstreams/" .. upstream_name4 .. "/targets/",
+        })
+        assert.response(targets).has.status(200)
+        local json = assert.response(targets).has.jsonbody()
+        assert.equal(3, #json.data)
+        assert.equal(3, json.total)
+
+        local active = assert(client:send {
+          method = "GET",
+          path = "/upstreams/" .. upstream_name4 .. "/targets/active/",
+        })
+        assert.response(active).has.status(200)
+        json = assert.response(active).has.jsonbody()
+        assert.equal(1, #json.data)
+        assert.equal(1, json.total)
+        assert.equal("api-1:80", json.data[1].target)
+      end)
+
+      it("acts as a sugar method to POST a target with 0 weight (by id)", function()
+        local res = assert(client:send {
+          method = "DELETE",
+          path = "/upstreams/" .. upstream_name4 .. "/targets/" .. target.id
         })
         assert.response(res).has.status(204)
 

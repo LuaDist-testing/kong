@@ -15,7 +15,7 @@ local function wait(second_offset)
   -- of the current minute is > 30, then we wait till the new minute kicks in
   local current_second = timestamp.get_timetable().sec
   if current_second > (second_offset or 0) then
-    os.execute("sleep "..tostring(60 - current_second))
+    ngx.sleep(60 - current_second)
   end
 end
 
@@ -474,7 +474,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
         }
       })
       local body = assert.res_status(429, res)
-      assert.equal([[{"message":"API rate limit exceeded for 'image'"}]], body)
+      local json = cjson.decode(body)
+      assert.same({ message = "API rate limit exceeded for 'image'" }, json)
     end)
 
     if policy == "cluster" then
@@ -554,7 +555,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             }
           })
           local body = assert.res_status(500, res)
-          assert.equal([[{"message":"An unexpected error occurred"}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = "An unexpected error occurred" }, json)
         end)
 
         it("keeps working if an error occurs", function()
@@ -633,7 +635,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             }
           })
           local body = assert.res_status(500, res)
-          assert.are.equal([[{"message":"An unexpected error occurred"}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = "An unexpected error occurred" }, json)
         end)
         it("keeps working if an error occurs", function()
           -- Make another request
@@ -702,7 +705,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             query = { cache = "shm" },
           })
           local body = assert.res_status(200, res)
-          assert.equal([[{"message":1}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = 1 }, json)
         end
 
         ngx.sleep(61) -- Wait for counter to expire

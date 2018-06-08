@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.10.1-0"
+version = "0.10.2-0"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.10.1-0",
+  tag = "0.10.2-0",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.10.1"
+--   tag = "0.10.2"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -28,7 +28,7 @@ dependencies = {
   "multipart == 0.5",
   "version == 0.2",
   "lapis == 1.5.1",
-  "lua-cassandra == 1.1.1",
+  "lua-cassandra == 1.2.1",
   "pgmoon-mashape == 2.0.1",
   "luatz == 0.3",
   "lua_system_constants == 0.1.1",
@@ -36,7 +36,7 @@ dependencies = {
   "luacrypto == 0.3.2",
   "luasyslog == 1.0.0",
   "lua_pack == 1.0.4",
-  "lua-resty-dns-client == 0.3.2",
+  "lua-resty-dns-client == 0.4.1",
   "lua-resty-worker-events == 0.3.0",
 }
 build = {
@@ -283,5 +283,8 @@ build = {
     ["kong.plugins.aws-lambda.handler"] = "kong/plugins/aws-lambda/handler.lua",
     ["kong.plugins.aws-lambda.schema"] = "kong/plugins/aws-lambda/schema.lua",
     ["kong.plugins.aws-lambda.v4"] = "kong/plugins/aws-lambda/v4.lua",
+
+    ["kong.plugins.request-termination.handler"] = "kong/plugins/request-termination/handler.lua",
+    ["kong.plugins.request-termination.schema"] = "kong/plugins/request-termination/schema.lua",
   }
 }

@@ -24,6 +24,22 @@
 -- |[[    ]]|
 -- ==========
 
+do
+  -- let's ensure the required shared dictionaries are
+  -- declared via lua_shared_dict in the Nginx conf
+
+  local constants = require "kong.constants"
+
+  for _, dict in ipairs(constants.DICTS) do
+    if not ngx.shared[dict] then
+      return error("missing shared dict '" .. dict .. "' in Nginx "          ..
+                   "configuration, are you using a custom template? "        ..
+                   "Make sure the 'lua_shared_dict " .. dict .. " [SIZE];' " ..
+                   "directive is defined.")
+    end
+  end
+end
+
 require("kong.core.globalpatches")()
 
 local dns = require "kong.tools.dns"
@@ -208,23 +224,26 @@ end
 
 function Kong.balancer()
   local addr = ngx.ctx.balancer_address
-  addr.tries = addr.tries + 1
-  if addr.tries > 1 then
+  local tries = addr.tries
+
+  addr.try_count = addr.try_count + 1
+  if addr.try_count > 1 then
     -- only call balancer on retry, first one is done in `core.access.before` which runs
     -- in the ACCESS context and hence has less limitations than this BALANCER context
     -- where the retries are executed
 
     -- record failure data
-    addr.failures = addr.failures or {}
-    local state, code = get_last_failure()
-    addr.failures[addr.tries-1] = { name = state, code = code }
+    local try = tries[addr.try_count - 1]
+    try.state, try.code = get_last_failure()
 
     local ok, err = balancer_execute(addr)
     if not ok then
-      return responses.send_HTTP_INTERNAL_SERVER_ERROR("failed to retry the "..
-        "dns/balancer resolver for '"..addr.upstream.host..
-        "' with: "..tostring(err))
+      ngx.log(ngx.ERR, "failed to retry the dns/balancer resolver for ",
+              addr.upstream.host, "' with: ", tostring(err))
+
+      return responses.send(500)
     end
+
   else
     -- first try, so set the max number of retries
     local retries = addr.retries
@@ -233,12 +252,19 @@ function Kong.balancer()
     end
   end
 
+  tries[addr.try_count] = {
+    ip    = addr.ip,
+    port  = addr.port,
+  }
+
   -- set the targets as resolved
   local ok, err = set_current_peer(addr.ip, addr.port)
   if not ok then
-    ngx.log(ngx.ERR, "failed to set the current peer (address:'",
-      tostring(addr.ip),"' port:",tostring(addr.port),"): ", tostring(err))
-    return responses.send_HTTP_INTERNAL_SERVER_ERROR()
+    ngx.log(ngx.ERR, "failed to set the current peer (address: ",
+            tostring(addr.ip), " port: ", tostring(addr.port),"): ",
+            tostring(err))
+
+    return responses.send(500)
   end
 
   ok, err = set_timeouts(addr.connect_timeout / 1000,
@@ -247,6 +273,19 @@ function Kong.balancer()
   if not ok then
     ngx.log(ngx.ERR, "could not set upstream timeouts: ", err)
   end
+end
+
+function Kong.rewrite()
+  core.rewrite.before()
+
+  -- we're just using the iterator, as in this rewrite phase no consumer nor
+  -- api will have been identified, hence we'll just be executing the global
+  -- plugins
+  for plugin, plugin_conf in plugins_iterator(singletons.loaded_plugins, true) do
+    plugin.handler:rewrite(plugin_conf)
+  end
+
+  core.rewrite.after()
 end
 
 function Kong.access()

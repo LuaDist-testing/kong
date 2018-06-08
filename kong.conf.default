@@ -115,6 +115,16 @@
                                  # process. When this number is exceeded, the
                                  # least recently used connections are closed.
 
+#server_tokens = on              # Enables or disables emitting Kong version on
+                                 # error pages and in the "Server" or "Via"
+                                 # (in case the request was proxied) response
+                                 # header field.
+
+#latency_tokens = on             # Enables or disables emitting Kong latency
+                                 # information in the "X-Kong-Proxy-Latency"
+                                 # and "X-Kong-Upstream-Latency" response
+                                 # header fields.
+
 #------------------------------------------------------------------------------
 # DATASTORE
 #------------------------------------------------------------------------------
@@ -203,6 +213,13 @@
                                        # `NetworkTopologyStrategy`.
                                        # The format is a comma-separated list
                                        # made of <dc_name>:<repl_factor>.
+
+#cassandra_schema_consensus_timeout = 10000  # Defines the timeout (in ms) for
+                                             # the waiting period to reach a
+                                             # schema consensus between your
+                                             # Cassandra nodes.
+                                             # This value is only used during
+                                             # migrations.
 
 #------------------------------------------------------------------------------
 # CLUSTERING

@@ -1,5 +1,6 @@
 local helpers = require "spec.helpers"
 local timestamp = require "kong.tools.timestamp"
+local cjson = require "cjson"
 
 local REDIS_HOST = "127.0.0.1"
 local REDIS_PORT = 6379
@@ -14,7 +15,7 @@ local function wait(second_offset)
   -- of the current minute is > 30, then we wait till the new minute kicks in
   local current_second = timestamp.get_timetable().sec
   if current_second > (second_offset or 0) then
-    os.execute("sleep "..tostring(60 - current_second))
+    ngx.sleep(60 - current_second)
   end
 end
 
@@ -220,7 +221,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
           }
         })
         local body = assert.res_status(429, res)
-        assert.are.equal([[{"message":"API rate limit exceeded"}]], body)
+        local json = cjson.decode(body)
+        assert.same({ message = "API rate limit exceeded" }, json)
       end)
 
       it("handles multiple limits", function()
@@ -255,7 +257,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
           }
         })
         local body = assert.res_status(429, res)
-        assert.are.equal([[{"message":"API rate limit exceeded"}]], body)
+        local json = cjson.decode(body)
+        assert.same({ message = "API rate limit exceeded" }, body)
         assert.are.equal(2, tonumber(res.headers["x-ratelimit-remaining-hour"]))
         assert.are.equal(0, tonumber(res.headers["x-ratelimit-remaining-minute"]))
       end)
@@ -288,7 +291,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             }
           })
           local body = assert.res_status(429, res)
-          assert.are.equal([[{"message":"API rate limit exceeded"}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = "API rate limit exceeded" }, json)
 
           -- Using a different key of the same consumer works
           local res = assert(helpers.proxy_client():send {
@@ -327,7 +331,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             }
           })
           local body = assert.res_status(429, res)
-          assert.are.equal([[{"message":"API rate limit exceeded"}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = "API rate limit exceeded" }, json)
         end)
         it("blocks if the only rate-limiting plugin existing is per consumer and not per API", function()
           for i = 1, 6 do
@@ -354,7 +359,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             }
           })
           local body = assert.res_status(429, res)
-          assert.are.equal([[{"message":"API rate limit exceeded"}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = "API rate limit exceeded" }, json)
         end)
       end)
     end)
@@ -422,7 +428,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             }
           })
           local body = assert.res_status(500, res)
-          assert.are.equal([[{"message":"An unexpected error occurred"}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = "An unexpected error occurred" }, json)
         end)
         it("keeps working if an error occurs", function()
           local res = assert(helpers.proxy_client():send {
@@ -490,7 +497,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             }
           })
           local body = assert.res_status(500, res)
-          assert.are.equal([[{"message":"An unexpected error occurred"}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = "An unexpected error occurred" }, json)
         end)
         it("keeps working if an error occurs", function()
           -- Make another request
@@ -561,7 +569,8 @@ for i, policy in ipairs({"local", "cluster", "redis"}) do
             query = { cache = "shm" },
           })
           local body = assert.res_status(200, res)
-          assert.equal([[{"message":1}]], body)
+          local json = cjson.decode(body)
+          assert.same({ message = 1 }, json)
         end
 
         ngx.sleep(61) -- Wait for counter to expire
