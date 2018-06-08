@@ -5,7 +5,6 @@
 [![Gitter Badge][gitter-badge]][gitter-url]
 
 - Website: [getkong.org][kong-url]
-- Website Repo: [github.com/getkong.org][kong-website] 
 - Docs: [getkong.org/docs][kong-docs]
 - Mailing List: [Google Groups][google-groups-url]
 
@@ -20,7 +19,10 @@ Kong was created to secure, manage and extend Microservices & APIs. Kong is powe
 - **Scalability**: Distributed by nature, Kong scales horizontally simply by adding nodes.
 - **Performance**: Kong handles load with ease by scaling and using NGINX at the core.
 - **Plugins**: Extendable architecture for adding functionality to Kong and APIs.
+  - **OAuth2.0**: Add easily an OAuth2.0 authentication to your APIs.
   - **Logging**: Log requests and responses to your system over HTTP, TCP, UDP or to disk.
+  - **IP-restriction**: Whitelist or blacklist IPs that can make requests.
+  - **Analytics**: Visualize, Inspect and Monitor API traffic with [Mashape Analytics](https://apianalytics.com).
   - **SSL**: Setup a specific SSL certificate for an underlying service or API
   - **Monitoring**: Live monitoring provides key load and performance server metrics.
   - **Authentication**: Manage consumer credentials query string and header tokens.
@@ -55,7 +57,7 @@ Over two minutes **117,185** requests with an average latency of **10ms** at **9
 
 4. Delete the `/etc/kong` folder: `[sudo] rm -rf /etc/kong`
 
-  This is necessary just in case you have previously installed Kong with a package distribution.
+  This is necessary to remove the configuration file of the previous Kong installation at step 1.
 
 5. Run `make dev`
 
@@ -86,12 +88,15 @@ When developing, use the `Makefile` for doing the following operations:
 | `dev`         | Setup your development environment                                       |
 | `clean`       | Clean your development environment                                       |
 | `start`       | Start the `DEVELOPMENT` environment (`kong_DEVELOPMENT.yml`)             |
+| `restart`     | Restart the `DEVELOPMENT` environment (`kong_DEVELOPMENT.yml`)           |
 | `seed`        | Seed the `DEVELOPMENT` environment (`kong_DEVELOPMENT.yml`)              |
 | `drop`        | Drop the `DEVELOPMENT` environment (`kong_DEVELOPMENT.yml`)              |
-| `lint`        | Lint Lua files in `kong/`                                                |
-| `coverage`    | Run unit tests + coverage report                                         |
+| `lint`        | Lint Lua files in `kong/` and `spec/`                                    |
 | `test`        | Run the unit tests                                                       |
+| `test-integration | Run the integration tests (Kong + DAO)                               |
+| `test-plugins | Run unit + integration tests of all plugins                              |
 | `test-all`    | Run all unit + integration tests at once                                 |
+| `coverage`    | Run all tests + coverage report                                          |
 
 ## Documentation
 
@@ -103,6 +108,12 @@ Complete & versioned documentation is available at [GetKong.org][kong-url]:
 - [Configuration](http://getkong.org/docs/latest/configuration/)
 - [CLI Reference](http://getkong.org/docs/latest/cli/)
 - [API Reference](http://getkong.org/docs/latest/admin-api)
+
+
+## Enterprise Support
+
+Support, Demo, Training, API Certifications and Consulting available at http://getkong.org/enterprise
+
 
 [kong-url]: http://getkong.org/
 [kong-website]: https://github.com/Mashape/getkong.org

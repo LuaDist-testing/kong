@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.4.0-1"
+version = "0.4.1-1"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.4.0-1",
+  tag = "0.4.1-1",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.4.0"
+--   tag = "0.4.1"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -52,6 +52,7 @@ build = {
     ["kong.constants"] = "kong/constants.lua",
 
     ["kong.cli.utils"] = "kong/cli/utils/utils.lua",
+    ["kong.cli.utils.dnsmasq"] = "kong/cli/utils/dnsmasq.lua",
     ["kong.cli.utils.signal"] = "kong/cli/utils/signal.lua",
     ["kong.cli.utils.input"] = "kong/cli/utils/input.lua",
     ["kong.cli.db"] = "kong/cli/db.lua",
@@ -140,6 +141,7 @@ build = {
 
     ["kong.plugins.mashape-analytics.handler"] = "kong/plugins/mashape-analytics/handler.lua",
     ["kong.plugins.mashape-analytics.schema"] = "kong/plugins/mashape-analytics/schema.lua",
+    ["kong.plugins.mashape-analytics.buffer"] = "kong/plugins/mashape-analytics/buffer.lua",
 
     ["kong.plugins.ratelimiting.handler"] = "kong/plugins/ratelimiting/handler.lua",
     ["kong.plugins.ratelimiting.access"] = "kong/plugins/ratelimiting/access.lua",
