@@ -19,4 +19,47 @@ helpers.for_each_dao(function(kong_conf)
       assert.equal(factory.daos.plugins, factory.plugins)
     end)
   end)
+
+  describe(":init() + :infos()", function()
+    it("returns DB info + 'unknown' for version if missing", function()
+      local factory = assert(Factory.new(kong_conf))
+      local info = factory:infos()
+
+      if kong_conf.database == "postgres" then
+        assert.same({
+          desc = "database",
+          name = kong_conf.pg_database,
+          version = "unknown",
+        }, info)
+
+      elseif kong_conf.database == "cassandra" then
+        assert.same({
+          desc = "keyspace",
+          name = kong_conf.cassandra_keyspace,
+          version = "unknown",
+        }, info)
+
+      else
+        error("unknown database")
+      end
+    end)
+
+    it("returns DB version if :init() called", function()
+      local factory = assert(Factory.new(kong_conf))
+      assert(factory:init())
+
+      local info = factory:infos()
+      assert.is_string(info.version)
+      assert.not_equal("unknown", info.version)
+    end)
+
+    if kong_conf.database == "cassandra" then
+      it("[cassandra] sets the 'major_version_n' field on the DB", function()
+        local factory = assert(Factory.new(kong_conf))
+        assert(factory:init())
+
+        assert.is_number(factory.db.major_version_n)
+      end)
+    end
+  end)
 end)

@@ -1,6 +1,5 @@
 local cjson = require "cjson.safe"
 local utils = require "kong.tools.utils"
-local singletons = require "kong.singletons"
 local constants = require "kong.constants"
 
 
@@ -22,6 +21,7 @@ local BUFFERED_REQUESTS_COUNT_KEYS = "events:requests"
 
 
 local _buffer = {}
+local _ping_infos = {}
 local _enabled = false
 local _unique_str = utils.random_string()
 local _buffer_immutable_idx
@@ -74,6 +74,10 @@ local function send_report(signal_type, t, host, port)
 
   for k, v in pairs(t) do
     if k == "unique_id" or (k ~= "created_at" and sub(k, -2) ~= "id") then
+      if type(v) == "function" then
+        v = v()
+      end
+		
       if type(v) == "table" then
         local json, err = cjson.encode(v)
         if err then
@@ -83,8 +87,10 @@ local function send_report(signal_type, t, host, port)
         v = json
       end
 
-      mutable_idx = mutable_idx + 1
-      _buffer[mutable_idx] = k .. "=" .. tostring(v)
+      if v ~= nil then
+        mutable_idx = mutable_idx + 1
+        _buffer[mutable_idx] = k .. "=" .. tostring(v)
+      end
     end
   end
 
@@ -158,15 +164,55 @@ local function ping_handler(premature)
     n_requests = 0
   end
 
-  send_report("ping", {
-    requests = n_requests,
-    unique_id = _unique_str,
-    database = singletons.configuration.database
-  })
+  _ping_infos.requests = n_requests
+  _ping_infos.unique_id = _unique_str
+
+  send_report("ping", _ping_infos)
 
   local ok, err = kong_dict:incr(BUFFERED_REQUESTS_COUNT_KEYS, -n_requests, n_requests)
   if not ok then
     log(ERR, "could not reset buffered requests count in 'kong' shm: ", err)
+  end
+end
+
+
+local function add_ping_value(k, v)
+  _ping_infos[k] = v
+end
+
+
+local retrieve_redis_version
+
+
+do
+  local _retrieved_redis_version = false
+
+
+  retrieve_redis_version = function(red)
+    if not _enabled or _retrieved_redis_version then
+      return
+    end
+
+    -- we will run this branch for each worker's first hit, but never
+    -- again. Hopefully someday Redis will be made a first class citizen
+    -- in Kong and its integration can be tied deeper into the core,
+    -- avoiding such "hacks".
+    _retrieved_redis_version = true
+
+    local redis_version
+
+    -- This logic should work for Redis >= 2.4.
+    local res, err = red:info("server")
+    if type(res) ~= "string" then
+      -- could be nil or ngx.null
+      ngx_log(ERR, "failed to retrieve Redis version: ", err)
+
+    else
+      -- retrieve first 2 digits only
+      redis_version = res:match("redis_version:(%d+%.%d+).-\r\n")
+    end
+
+    add_ping_value("redis_version", redis_version or "unknown")
   end
 end
 
@@ -179,6 +225,10 @@ return {
     end
 
     create_timer(PING_INTERVAL, ping_handler)
+  end,
+  add_ping_value = add_ping_value,
+  get_ping_value = function(k)
+    return _ping_infos[k]
   end,
   log = function()
     if not _enabled then
@@ -197,4 +247,5 @@ return {
     _enabled = enable
   end,
   send = send_report,
+  retrieve_redis_version = retrieve_redis_version,
 }
