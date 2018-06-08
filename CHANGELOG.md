@@ -1,5 +1,43 @@
 ## [Unreleased][unreleased]
 
+## [0.8.0] - 2016/04/13
+
+This release includes support for PostgreSQL as Kong's primary datastore!
+
+### Breaking changes
+
+- Remove support for the long deprecated `/consumers/:consumer/keyauth/` and `/consumers/:consumer/basicauth/` routes (deprecated in `0.5.0`). The new routes (available since `0.5.0` too) use the real name of the plugin: `/consumers/:consumer/key-auth` and `/consumers/:consumer/basic-auth`.
+
+### Added
+
+- Support for PostgreSQL 9.4+ as Kong's primary datastore. [#331](https://github.com/Mashape/kong/issues/331) [#1054](https://github.com/Mashape/kong/issues/1054)
+- Configurable Cassandra reading/writing consistency. [#1026](https://github.com/Mashape/kong/pull/1026)
+- Admin API: including pending and running timers count in the response to `/`. [#992](https://github.com/Mashape/kong/pull/992)
+- Plugins
+  - **New correlation-id plugin**: assign unique identifiers to the requests processed by Kong. Courtesy of [@opyate](https://github.com/opyate). [#1094](https://github.com/Mashape/kong/pull/1094)
+  - LDAP: add support for LDAP authentication. [#1133](https://github.com/Mashape/kong/pull/1133)
+  - StatsD: add support for StatsD logging. [#1142](https://github.com/Mashape/kong/pull/1142)
+  - JWT: add support for RS256 signed tokens thanks to [@kdstew](https://github.com/kdstew)! [#1053](https://github.com/Mashape/kong/pull/1053)
+  - ACL: appends `X-Consumer-Groups` to the request, so the upstream service can check what groups the consumer belongs to. [#1154](https://github.com/Mashape/kong/pull/1154)
+  - Galileo (mashape-analytics): increase batch sending timeout to 30s. [#1091](https://github.com/Mashape/kong/pull/1091)
+- Added `ttl_on_failure` option in the cluster configuration, to configure the TTL of failed nodes. [#1125](https://github.com/Mashape/kong/pull/1125)
+
+### Fixed
+
+- Introduce a new `port` option when connecting to your Cassandra cluster instead of using the CQL default (9042). [#1139](https://github.com/Mashape/kong/issues/1139)
+- Plugins
+  - Request/Response Transformer: add missing migrations for upgrades from ` <= 0.5.x`. [#1064](https://github.com/Mashape/kong/issues/1064)
+  - OAuth2
+    - Error responses comply to RFC 6749. [#1017](https://github.com/Mashape/kong/issues/1017)
+    - Handle multipart requests. [#1067](https://github.com/Mashape/kong/issues/1067)
+    - Make access_tokens correctly expire. [#1089](https://github.com/Mashape/kong/issues/1089)
+
+> **internal**
+> - replace globals with singleton pattern thanks to [@mars](https://github.com/mars).
+> - fixed resolution mismatches when using deep paths in the path resolver thanks to [siddharthkchatterjee](https://github.com/siddharthkchatterjee)
+
+## [0.7.0] - 2016/02/24
+
 ### Breaking changes
 
 Due to the NGINX security fixes (CVE-2016-0742, CVE-2016-0746, CVE-2016-0747), OpenResty was bumped to `1.9.7.3` which is not backwards compatible, and thus requires changes to be made to the `nginx` property of Kong's configuration file. See the [0.7 upgrade path](https://github.com/Mashape/kong/blob/master/UPGRADE.md#upgrade-to-07x) for instructions.
@@ -27,8 +65,8 @@ However by upgrading the underlying OpenResty version, source installations do n
     - Add `PUT` support to the `/auth2_tokens` route. [#897](https://github.com/Mashape/kong/pull/897)
     - Better error message when the `access_token` is missing. [#1003](https://github.com/Mashape/kong/pull/1003)
   - IP restriction: Fix an issue that could arise when restarting Kong. Now Kong does not need to be restarted for the ip-restriction configuration to take effect. [#782](https://github.com/Mashape/kong/pull/782) [#960](https://github.com/Mashape/kong/pull/960)
-  - SSL: Replace shelled out openssl calls with native `ngx.ssl` conversion utilities, which preserve the certificate chain. [#968](https://github.com/Mashape/kong/pull/968)
   - ACL: Properly invalidating entities when assigning a new ACL group. [#996](https://github.com/Mashape/kong/pull/996)
+  - SSL: Replace shelled out openssl calls with native `ngx.ssl` conversion utilities, which preserve the certificate chain. [#968](https://github.com/Mashape/kong/pull/968)
 - Avoid user warning on start when the user is not root. [#964](https://github.com/Mashape/kong/pull/964)
 - Store Serf logs in NGINX working directory to prevent eventual permission issues. [#975](https://github.com/Mashape/kong/pull/975)
 - Allow plugins configured on a Consumer *without* being configured on an API to run. [#978](https://github.com/Mashape/kong/issues/978) [#980](https://github.com/Mashape/kong/pull/980)
@@ -505,7 +543,9 @@ First version running with Cassandra.
 - CLI `bin/kong` script.
 - Database migrations (using `db.lua`).
 
-[unreleased]: https://github.com/mashape/kong/compare/0.6.1...next
+[unreleased]: https://github.com/mashape/kong/compare/0.8.0...next
+[0.8.0]: https://github.com/mashape/kong/compare/0.7.0...0.8.0
+[0.7.0]: https://github.com/mashape/kong/compare/0.6.1...0.7.0
 [0.6.1]: https://github.com/mashape/kong/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/mashape/kong/compare/0.5.4...0.6.0
 [0.5.4]: https://github.com/mashape/kong/compare/0.5.3...0.5.4

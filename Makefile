@@ -22,8 +22,8 @@ dev: install
       echo $$rock already installed, skipping ; \
     fi \
 	done;
-	bin/kong config -c kong.yml -e TEST
-	bin/kong config -c kong.yml -e DEVELOPMENT
+	bin/kong config -c kong.yml -e TEST -s TEST
+	bin/kong config -c kong.yml -e DEVELOPMENT -s DEVELOPMENT
 	bin/kong migrations -c $(DEVELOPMENT_CONF) up
 
 clean:
@@ -36,7 +36,14 @@ doc:
 	@ldoc -c config.ld kong
 
 lint:
-	@find kong spec -name '*.lua' -not -name 'invalid-module.lua' -not -path 'kong/vendor/*' | xargs luacheck -q
+	@luacheck -q . \
+						--exclude-files 'kong/vendor/**/*.lua' \
+						--exclude-files 'spec/unit/fixtures/invalid-module.lua' \
+						--std 'ngx_lua+busted' \
+						--globals '_KONG' \
+						--globals 'ngx' \
+						--no-redefined \
+						--no-unused-args
 
 test:
 	@busted -v spec/unit

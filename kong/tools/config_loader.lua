@@ -2,7 +2,6 @@ local yaml = require "yaml"
 local IO = require "kong.tools.io"
 local utils = require "kong.tools.utils"
 local logger = require "kong.cli.utils.logger"
-local luarocks = require "kong.cli.utils.luarocks"
 local stringy = require "stringy"
 local constants = require "kong.constants"
 local config_defaults = require "kong.tools.config_defaults"
@@ -28,7 +27,7 @@ local function is_valid_IPv4(ip)
   if b < 0 or 255 < b then return false end
   if c < 0 or 255 < c then return false end
   if d < 0 or 255 < d then return false end
-  
+
   return true
 end
 
@@ -141,6 +140,16 @@ function _M.validate(config)
   return true
 end
 
+local DEFAULT_CONFIG = {}
+
+function _M.default_config()
+  if next(DEFAULT_CONFIG) == nil then
+    _M.validate(DEFAULT_CONFIG)
+  end
+
+  return DEFAULT_CONFIG
+end
+
 function _M.load(config_path)
   local config_contents = IO.read_file(config_path)
   if not config_contents then
@@ -148,7 +157,11 @@ function _M.load(config_path)
     os.exit(1)
   end
 
-  local config = yaml.load(config_contents)
+  local status,config = pcall(yaml.load,config_contents)
+  if not status then
+    logger:error("Could not parse configuration at: "..config_path)
+    os.exit(1)
+  end
 
   local ok, errors = _M.validate(config)
   if not ok then
@@ -182,17 +195,12 @@ function _M.load(config_path)
     config.nginx_working_dir = fs.current_dir().."/"..config.nginx_working_dir
   end
 
-  config.plugins = utils.table_merge(constants.PLUGINS_AVAILABLE, config.custom_plugins)
+  config.plugins = utils.concat(constants.PLUGINS_AVAILABLE, config.custom_plugins)
 
   return config, config_path
 end
 
 function _M.load_default(config_path)
-  if not IO.file_exists(config_path) then
-    logger:warn("No configuration at: "..config_path.." using default config instead.")
-    config_path = IO.path:join(luarocks.get_config_dir(), "kong.yml")
-  end
-
   logger:info("Using configuration: "..config_path)
 
   return _M.load(config_path)
