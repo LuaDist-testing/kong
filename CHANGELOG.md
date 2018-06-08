@@ -1,10 +1,16 @@
 ## [Unreleased][unreleased]
 
+## [0.3.2] - 2015/06/08
+
+#### Fixed
+
+- Fix uppercase Cassandra keyspace bug that prevented Kong to work with [kongdb.org](http://kongdb.org/)
+
 ## [0.3.1] - 2015/06/07
 
 #### Fixed
 
-- Fixed a critical datastore migration bug [#303](https://github.com/Mashape/kong/issues/303)
+- Schema migrations are now automatic, which was missing from previous releases. [#303](https://github.com/Mashape/kong/issues/303)
 
 ## [0.3.0] - 2015/06/04
 
@@ -163,6 +169,7 @@ First version running with Cassandra.
 - Database migrations (using `db.lua`).
 
 [unreleased]: https://github.com/mashape/kong/compare/0.3.0...HEAD
+[0.3.2]: https://github.com/mashape/kong/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/mashape/kong/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/mashape/kong/compare/0.2.1...0.3.0
 [0.2.1]: https://github.com/mashape/kong/compare/0.2.0-2...0.2.1

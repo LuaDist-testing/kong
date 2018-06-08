@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.3.1-1"
+version = "0.3.2-1"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.3.1-1",
+  tag = "0.3.2-1",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.3.1"
+--   tag = "0.3.2"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -27,7 +27,7 @@ dependencies = {
   "yaml ~> 1.1.1-1",
   "lapis ~> 1.1.0-1",
   "stringy ~> 0.4-1",
-  "cassandra ~> 0.5-7",
+  "kong-cassandra ~> 0.5-8",
   "multipart ~> 0.1-3",
   "lua-path ~> 0.2.3-1",
   "lua-cjson ~> 2.1.0-1",
@@ -90,13 +90,10 @@ build = {
     ["kong.dao.schemas.plugins_configurations"] = "kong/dao/schemas/plugins_configurations.lua",
     ["kong.dao.cassandra.factory"] = "kong/dao/cassandra/factory.lua",
     ["kong.dao.cassandra.base_dao"] = "kong/dao/cassandra/base_dao.lua",
+    ["kong.dao.cassandra.migrations"] = "kong/dao/cassandra/migrations.lua",
     ["kong.dao.cassandra.apis"] = "kong/dao/cassandra/apis.lua",
     ["kong.dao.cassandra.consumers"] = "kong/dao/cassandra/consumers.lua",
     ["kong.dao.cassandra.plugins_configurations"] = "kong/dao/cassandra/plugins_configurations.lua",
-    ["kong.dao.cassandra.migrations"] = "kong/dao/cassandra/migrations.lua",
-    ["kong.dao.cassandra.ratelimiting_metrics"] = "kong/dao/cassandra/ratelimiting_metrics.lua",
-    ["kong.dao.cassandra.basicauth_credentials"] = "kong/dao/cassandra/basicauth_credentials.lua",
-    ["kong.dao.cassandra.keyauth_credentials"] = "kong/dao/cassandra/keyauth_credentials.lua",
 
     ["kong.plugins.base_plugin"] = "kong/plugins/base_plugin.lua",
 
@@ -104,11 +101,17 @@ build = {
     ["kong.plugins.basicauth.access"] = "kong/plugins/basicauth/access.lua",
     ["kong.plugins.basicauth.schema"] = "kong/plugins/basicauth/schema.lua",
     ["kong.plugins.basicauth.api"] = "kong/plugins/basicauth/api.lua",
+    ["kong.plugins.basicauth.daos"] = "kong/plugins/basicauth/daos.lua",
 
     ["kong.plugins.keyauth.handler"] = "kong/plugins/keyauth/handler.lua",
     ["kong.plugins.keyauth.access"] = "kong/plugins/keyauth/access.lua",
     ["kong.plugins.keyauth.schema"] = "kong/plugins/keyauth/schema.lua",
     ["kong.plugins.keyauth.api"] = "kong/plugins/keyauth/api.lua",
+    ["kong.plugins.keyauth.daos"] = "kong/plugins/keyauth/daos.lua",
+
+    ["kong.plugins.oauth.handler"] = "kong/plugins/oauth/handler.lua",
+    ["kong.plugins.oauth.access"] = "kong/plugins/oauth/access.lua",
+    ["kong.plugins.oauth.schema"] = "kong/plugins/oauth/schema.lua",
 
     ["kong.plugins.tcplog.handler"] = "kong/plugins/tcplog/handler.lua",
     ["kong.plugins.tcplog.log"] = "kong/plugins/tcplog/log.lua",
@@ -130,7 +133,8 @@ build = {
     ["kong.plugins.ratelimiting.handler"] = "kong/plugins/ratelimiting/handler.lua",
     ["kong.plugins.ratelimiting.access"] = "kong/plugins/ratelimiting/access.lua",
     ["kong.plugins.ratelimiting.schema"] = "kong/plugins/ratelimiting/schema.lua",
-    
+    ["kong.plugins.ratelimiting.daos"] = "kong/plugins/ratelimiting/daos.lua",
+
     ["kong.plugins.requestsizelimiting.handler"] = "kong/plugins/requestsizelimiting/handler.lua",
     ["kong.plugins.requestsizelimiting.access"] = "kong/plugins/requestsizelimiting/access.lua",
     ["kong.plugins.requestsizelimiting.schema"] = "kong/plugins/requestsizelimiting/schema.lua",
