@@ -457,6 +457,9 @@ function _M.new(apis)
     return max_uri_a > max_uri_b
   end
 
+  table.sort(uris_prefixes, function(a, b)
+    return #a > #b
+  end)
 
   for category_bit, category in pairs(categories) do
     table.sort(category.apis, function(a, b)
@@ -517,7 +520,8 @@ function _M.new(apis)
 
     do
       local api_t_from_cache = cache:get(cache_key)
-      if api_t_from_cache then
+      if api_t_from_cache and match_api(api_t_from_cache, method, uri, host)
+      then
         return api_t_from_cache
       end
     end
@@ -561,6 +565,8 @@ function _M.new(apis)
         end
 
         if from then
+          -- strip \Q...\E tokens
+          uri = sub(uris_prefixes[i], 3, -3)
           req_category = bor(req_category, MATCH_RULES.URI)
           break
         end

@@ -605,6 +605,25 @@ describe("Router", function()
           assert.same(use_case[#use_case], api_t.api)
         end)
       end)
+
+      it("does not incorrectly match another API which has a longer [uri]", function()
+        local use_case = {
+          {
+            name = "api-1",
+            uris = { "/a", "/bbbbbbb" }
+          },
+          {
+            name = "api-2",
+            uris = { "/a/bb" }
+          },
+        }
+
+        local router = assert(Router.new(use_case))
+
+        local api_t = router.select("GET", "/a/bb/foobar")
+        assert.truthy(api_t)
+        assert.same(use_case[2], api_t.api)
+      end)
     end)
 
     describe("misses", function()
@@ -1025,8 +1044,18 @@ describe("Router", function()
         assert.equal("/", _ngx.var.request_uri)
 
         _ngx = mock_ngx("GET", "/this-api", {})
-        local api2 = router.exec(_ngx)
-        assert.same(use_case_apis[1], api2)
+        api = router.exec(_ngx)
+        assert.same(use_case_apis[1], api)
+        assert.equal("/", _ngx.var.request_uri)
+
+        _ngx = mock_ngx("GET", "/my-api", {})
+        api = router.exec(_ngx)
+        assert.same(use_case_apis[1], api)
+        assert.equal("/", _ngx.var.request_uri)
+
+        _ngx = mock_ngx("GET", "/this-api", {})
+        api = router.exec(_ngx)
+        assert.same(use_case_apis[1], api)
         assert.equal("/", _ngx.var.request_uri)
       end)
 
