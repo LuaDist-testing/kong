@@ -1,5 +1,4 @@
 local spec_helper = require "spec.spec_helpers"
-local utils = require "kong.tools.utils"
 local yaml = require "yaml"
 local IO = require "kong.tools.io"
 
@@ -8,9 +7,6 @@ local SERVER_CONF = "kong_TEST_SERVER.yml"
 
 local function replace_conf_property(key, value)
   local yaml_value = yaml.load(IO.read_file(TEST_CONF))
-  if type(value) == "table" and utils.table_size(value) == 0 then
-    value = nil
-  end
   yaml_value[key] = value
   local ok = IO.write_to_file(SERVER_CONF, yaml.dump(yaml_value))
   assert.truthy(ok)
@@ -61,14 +57,14 @@ describe("CLI", function()
     end)
 
     it("should not fail when an existing plugin is being enabled", function()
-      replace_conf_property("plugins_available", {"keyauth"})
+      replace_conf_property("plugins_available", {"key-auth"})
 
       local _, exit_code = spec_helper.start_kong(SERVER_CONF, true)
       assert.are.same(0, exit_code)
     end)
 
     it("should not work when an unexisting plugin is being enabled along with an existing one", function()
-      replace_conf_property("plugins_available", {"keyauth", "wot-wat"})
+      replace_conf_property("plugins_available", {"key-auth", "wot-wat"})
 
       assert.error_matches(function()
         spec_helper.start_kong(SERVER_CONF, true)
@@ -78,22 +74,22 @@ describe("CLI", function()
     it("should not work when a plugin is being used in the DB but it's not in the configuration", function()
       spec_helper.get_env(SERVER_CONF).faker:insert_from_table {
         api = {
-          {name = "tests cli 1", public_dns = "foo.com", target_url = "http://mockbin.com"},
+          {name = "tests-cli", request_host = "foo.com", upstream_url = "http://mockbin.com"},
         },
-        plugin_configuration = {
-          {name = "ratelimiting", value = {minute = 6}, __api = 1},
+        plugin = {
+          {name = "rate-limiting", config = {minute = 6}, __api = 1},
         }
       }
 
-      replace_conf_property("plugins_available", {"ssl", "keyauth", "basicauth", "oauth2", "tcplog", "udplog", "filelog", "httplog", "request_transformer", "cors"})
+      replace_conf_property("plugins_available", {"ssl", "key-auth", "basic-auth", "oauth2", "tcp-log", "udp-log", "file-log", "http-log", "request-transformer", "cors"})
 
       assert.error_matches(function()
         spec_helper.start_kong(SERVER_CONF, true)
-      end, "You are using a plugin that has not been enabled in the configuration: ratelimiting")
+      end, "You are using a plugin that has not been enabled in the configuration: rate-limiting", nil, true)
     end)
 
     it("should work the used plugins are enabled", function()
-      replace_conf_property("plugins_available", {"ssl", "keyauth", "basicauth", "oauth2", "tcplog", "udplog", "filelog", "httplog", "request_transformer", "ratelimiting", "cors"})
+      replace_conf_property("plugins_available", {"ssl", "key-auth", "basic-auth", "oauth2", "tcp-log", "udp-log", "file-log", "http-log", "request-transformer", "rate-limiting", "cors"})
 
       local _, exit_code = spec_helper.start_kong(SERVER_CONF, true)
       assert.are.same(0, exit_code)

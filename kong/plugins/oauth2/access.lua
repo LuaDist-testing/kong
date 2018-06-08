@@ -196,9 +196,6 @@ local function retrieve_client_credentials(parameters)
         local basic_parts = stringy.split(decoded_basic, ":")
         client_id = basic_parts[1]
         client_secret = basic_parts[2]
-
-        print(client_id)
-        print(client_secret)
       end
     end
   end
@@ -216,9 +213,9 @@ local function issue_token(conf)
     response_params = {[ERROR] = "access_denied", error_description = "You must use HTTPS"}
   else
     local grant_type = parameters[GRANT_TYPE]
-    if not (grant_type == GRANT_AUTHORIZATION_CODE or 
-            grant_type == GRANT_REFRESH_TOKEN or 
-            (conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS) or 
+    if not (grant_type == GRANT_AUTHORIZATION_CODE or
+            grant_type == GRANT_REFRESH_TOKEN or
+            (conf.enable_client_credentials and grant_type == GRANT_CLIENT_CREDENTIALS) or
             (conf.enable_password_grant and grant_type == GRANT_PASSWORD)) then
       response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..GRANT_TYPE}
     end
@@ -247,12 +244,17 @@ local function issue_token(conf)
           response_params = generate_token(conf, client, authorization_code.authenticated_userid, authorization_code.scope, state)
         end
       elseif grant_type == GRANT_CLIENT_CREDENTIALS then
-        -- Check scopes
-        local ok, scopes = retrieve_scopes(parameters, conf)
-        if not ok then
-          response_params = scopes -- If it's not ok, then this is the error message
+        -- Only check the provision_key if the authenticated_userid is being set
+        if parameters.authenticated_userid and conf.provision_key ~= parameters.provision_key then 
+          response_params = {[ERROR] = "invalid_provision_key", error_description = "Invalid Kong provision_key"}
         else
-          response_params = generate_token(conf, client, nil, table.concat(scopes, " "), state)
+          -- Check scopes
+          local ok, scopes = retrieve_scopes(parameters, conf)
+          if not ok then
+            response_params = scopes -- If it's not ok, then this is the error message
+          else
+            response_params = generate_token(conf, client, parameters.authenticated_userid, table.concat(scopes, " "), state)
+          end
         end
       elseif grant_type == GRANT_PASSWORD then
         -- Check that it comes from the right client
@@ -266,7 +268,7 @@ local function issue_token(conf)
           if not ok then
             response_params = scopes -- If it's not ok, then this is the error message
           else
-            response_params = generate_token(conf, client, nil, table.concat(scopes, " "), state)
+            response_params = generate_token(conf, client, parameters.authenticated_userid, table.concat(scopes, " "), state)
           end
         end
       elseif grant_type == GRANT_REFRESH_TOKEN then
@@ -353,9 +355,10 @@ local function parse_access_token(conf)
 end
 
 function _M.execute(conf)
-  local path_prefix = ngx.ctx.api.path or ""
+  -- Check if the API has a request_path and if it's being invoked with the path resolver
+  local path_prefix = (ngx.ctx.api.request_path and stringy.startswith(ngx.var.request_uri, ngx.ctx.api.request_path)) and ngx.ctx.api.request_path or ""
   if stringy.endswith(path_prefix, "/") then
-    path_prefix = path_prefix:sub(1, path_prefix:len() - 1) 
+    path_prefix = path_prefix:sub(1, path_prefix:len() - 1)
   end
 
   if ngx.req.get_method() == "POST" then

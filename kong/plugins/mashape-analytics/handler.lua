@@ -16,7 +16,11 @@
 
 local ALFBuffer = require "kong.plugins.mashape-analytics.buffer"
 local BasePlugin = require "kong.plugins.base_plugin"
-local ALFSerializer = require "kong.plugins.log_serializers.alf"
+local ALFSerializer = require "kong.plugins.log-serializers.alf"
+
+local ngx_now = ngx.now
+local ngx_log = ngx.log
+local ngx_log_ERR = ngx.ERR
 
 local ALF_BUFFERS = {} -- buffers per-api
 
@@ -32,11 +36,24 @@ function AnalyticsHandler:access(conf)
   -- Retrieve and keep in memory the bodies for this request
   ngx.ctx.analytics = {
     req_body = "",
-    res_body = ""
+    res_body = "",
+    req_post_args = {}
   }
 
+  ngx.req.read_body()
+
+  local status, res = pcall(ngx.req.get_post_args)
+  if not status then
+    if res == "requesty body in temp file not supported" then
+      ngx_log(ngx_log_ERR, "[mashape-analytics] cannot read request body from temporary file. Try increasing the client_body_buffer_size directive.")
+    else
+      ngx_log(ngx_log_ERR, res)
+    end
+  else
+    ngx.ctx.analytics.req_post_args = res
+  end
+
   if conf.log_body then
-    ngx.req.read_body()
     ngx.ctx.analytics.req_body = ngx.req.get_body_data()
   end
 end
@@ -51,7 +68,7 @@ function AnalyticsHandler:body_filter(conf)
   end
 
   if eof then -- latest chunk
-    ngx.ctx.analytics.response_received = ngx.now() * 1000
+    ngx.ctx.analytics.response_received = ngx_now() * 1000
   end
 end
 

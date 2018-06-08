@@ -40,7 +40,7 @@ describe("OAuth 2 Credentials API", function()
       end)
 
     end)
-    
+
     describe("PUT", function()
       setup(function()
         spec_helper.get_env().dao_factory.keyauth_credentials:delete({id=credential.id})
@@ -60,7 +60,7 @@ describe("OAuth 2 Credentials API", function()
       end)
 
     end)
-   
+
     describe("GET", function()
 
       it("should retrieve all", function()
@@ -74,12 +74,14 @@ describe("OAuth 2 Credentials API", function()
   end)
 
   describe("/consumers/:consumer/oauth2/:id", function()
-    
+
     describe("GET", function()
 
       it("should retrieve by id", function()
-        local _, status = http_client.get(BASE_URL..credential.id)
+        local response, status = http_client.get(BASE_URL..credential.id)
         assert.equal(200, status)
+        local body = json.decode(response)
+        assert.equals(credential.id, body.id)
       end)
 
     end)
@@ -117,6 +119,6 @@ describe("OAuth 2 Credentials API", function()
       end)
 
     end)
-    
+
   end)
 end)

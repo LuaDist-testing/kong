@@ -1,4 +1,3 @@
-local validations = require "kong.dao.schemas_validation"
 local crud = require "kong.api.crud_helpers"
 local syslog = require "kong.tools.syslog"
 local constants = require "kong.constants"
@@ -41,11 +40,11 @@ return {
     end,
 
     GET = function(self, dao_factory)
-      crud.paginated_set(self, dao_factory.plugins_configurations)
+      crud.paginated_set(self, dao_factory.plugins)
     end,
 
     POST = function(self, dao_factory, helpers)
-      crud.post(self.params, dao_factory.plugins_configurations, function(data)
+      crud.post(self.params, dao_factory.plugins, function(data)
         if configuration.send_anonymous_reports then
           data.signal = constants.SYSLOG.API
           syslog.log(syslog.format_entity(data))
@@ -54,22 +53,22 @@ return {
     end,
 
     PUT = function(self, dao_factory, helpers)
-      crud.put(self.params, dao_factory.plugins_configurations)
+      crud.put(self.params, dao_factory.plugins)
     end
   },
 
-  ["/apis/:name_or_id/plugins/:plugin_name_or_id"] = {
+  ["/apis/:name_or_id/plugins/:plugin_id"] = {
     before = function(self, dao_factory, helpers)
       crud.find_api_by_name_or_id(self, dao_factory, helpers)
       self.params.api_id = self.api.id
 
       local fetch_keys = {
         api_id = self.api.id,
-        [validations.is_valid_uuid(self.params.plugin_name_or_id) and "id" or "name"] = self.params.plugin_name_or_id
+        id = self.params.plugin_id
       }
-      self.params.plugin_name_or_id = nil
+      self.params.plugin_id = nil
 
-      local data, err = dao_factory.plugins_configurations:find_by_keys(fetch_keys)
+      local data, err = dao_factory.plugins:find_by_keys(fetch_keys)
       if err then
         return helpers.yield_error(err)
       end
@@ -85,11 +84,11 @@ return {
     end,
 
     PATCH = function(self, dao_factory, helpers)
-      crud.patch(self.params, self.plugin, dao_factory.plugins_configurations)
+      crud.patch(self.params, self.plugin, dao_factory.plugins)
     end,
 
     DELETE = function(self, dao_factory)
-      crud.delete(self.plugin, dao_factory.plugins_configurations)
+      crud.delete(self.plugin, dao_factory.plugins)
     end
   }
 }

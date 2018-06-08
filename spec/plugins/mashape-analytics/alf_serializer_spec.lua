@@ -1,5 +1,5 @@
 local fixtures = require "spec.plugins.mashape-analytics.fixtures.requests"
-local ALFSerializer = require "kong.plugins.log_serializers.alf"
+local ALFSerializer = require "kong.plugins.log-serializers.alf"
 
 -- @see http://lua-users.org/wiki/CopyTable
 local function deepcopy(orig)
@@ -90,7 +90,7 @@ describe("ALF serializer", function()
       assert.equal("1.2", alf.har.log.version)
       assert.truthy(alf.har.log.creator)
       assert.equal("mashape-analytics-agent-kong", alf.har.log.creator.name)
-      assert.equal("1.0.1", alf.har.log.creator.version)
+      assert.equal("1.0.2", alf.har.log.creator.version)
       assert.truthy(alf.har.log.entries)
       assert.equal(1, #(alf.har.log.entries))
     end)
