@@ -1,13 +1,12 @@
 local Object = require "classic"
-local inspect = require "inspect"
 local utils = require "kong.tools.utils"
 
 math.randomseed(os.time())
 
--- Return a random elements from an array
--- @param {table} t Array to get an element from
--- @return A random element
-local function random_from_table(t, remove)
+-- Return a random element from an array.
+-- @param `t` Array to get an element from.
+-- @return    A random element from the `t` array.
+local function random_from_table(t)
   if not t then return {} end
   return t[math.random(#t)]
 end
@@ -30,9 +29,12 @@ Faker.FIXTURES = {
     { name = "API TESTS 3", public_dns = "test3.com", target_url = "http://mockbin.com" },
     { name = "API TESTS 4", public_dns = "test4.com", target_url = "http://mockbin.com" },
     { name = "API TESTS 5", public_dns = "test5.com", target_url = "http://mockbin.com" },
-
     { name = "API TESTS 6", public_dns = "cors1.com", target_url = "http://mockbin.com" },
     { name = "API TESTS 7", public_dns = "cors2.com", target_url = "http://mockbin.com" },
+    { name = "API TESTS 8 (logging)", public_dns = "logging.com", target_url = "http://mockbin.com" },
+
+    { name = "API TESTS 8 (dns)", public_dns = "dns1.com", target_url = "http://127.0.0.1:7771" },
+    { name = "API TESTS 9 (dns)", public_dns = "dns2.com", target_url = "http://localhost:7771" },
 
     -- DEVELOPMENT APIs. Please do not use those in tests
     { name = "API DEV 1", public_dns = "dev.com", target_url = "http://mockbin.com" },
@@ -41,19 +43,9 @@ Faker.FIXTURES = {
     { custom_id = "provider_123" },
     { custom_id = "provider_124" }
   },
-  keyauth_credential = {
-    { key = "apikey122", __consumer = 1 },
-    { key = "apikey123", __consumer = 2 }
-  },
-  basicauth_credential = {
-    { username = "username", password = "password", __consumer = 1 },
-  },
   plugin_configuration = {
     -- API 1
     { name = "keyauth", value = { key_names = { "apikey" }}, __api = 1 },
-    { name = "tcplog", value = { host = "127.0.0.1", port = 7777 }, __api = 1 },
-    { name = "udplog", value = { host = "127.0.0.1", port = 8888 }, __api = 1 },
-    { name = "filelog", value = { }, __api = 1 },
     -- API 2
     { name = "basicauth", value = {}, __api = 2 },
     -- API 3
@@ -73,18 +65,30 @@ Faker.FIXTURES = {
     -- API 6
     { name = "cors", value = {}, __api = 6 },
     -- API 7
-    { name = "cors", value = { origin = "example.com", 
-                               methods = "GET", 
-                               headers = "origin, type, accepts", 
+    { name = "cors", value = { origin = "example.com",
+                               methods = "GET",
+                               headers = "origin, type, accepts",
                                exposed_headers = "x-auth-token",
                                max_age = 23,
-                               credentials = true }, __api = 7 }
+                               credentials = true }, __api = 7 },
+    -- API 8
+    { name = "tcplog", value = { host = "127.0.0.1", port = 7777 }, __api = 8 },
+    { name = "udplog", value = { host = "127.0.0.1", port = 8888 }, __api = 8 },
+    { name = "filelog", value = {}, __api = 8 },
+  },
+  -- TODO: remove plugins from core
+  keyauth_credential = {
+    { key = "apikey122", __consumer = 1 },
+    { key = "apikey123", __consumer = 2 }
+  },
+  basicauth_credential = {
+    { username = "username", password = "password", __consumer = 1 }
   }
 }
 
 -- Generate a fake entity
--- @param {string} type Type of the entity to generate
--- @return {table} An entity schema
+-- @param `type`  Type of the entity to generate.
+-- @return        An valid entity (a table) complying to the defined schema.
 function Faker:fake_entity(type)
   local r = math.random(1, 1000000000)
 
@@ -97,17 +101,6 @@ function Faker:fake_entity(type)
   elseif type == "consumer" then
     return {
       custom_id = "random_custom_id_"..r
-    }
-  elseif type == "basicauth_credential" then
-    return {
-      consumer_id = random_from_table(self.inserted_entities.consumer).id,
-      username = "username_random"..r,
-      password = "password_random"..r
-    }
-  elseif type == "keyauth_credential" then
-    return {
-      consumer_id = random_from_table(self.inserted_entities.consumer).id,
-      key = "key_random"..r
     }
   elseif type == "plugin_configuration" then
     local plugin_type = random_from_table({ "keyauth", "ratelimiting" })
@@ -122,6 +115,18 @@ function Faker:fake_entity(type)
       value = plugin_value,
       api_id = nil,
       consumer_id = nil
+    }
+    -- TODO: remove plugins from core
+  elseif type == "basicauth_credential" then
+    return {
+      consumer_id = random_from_table(self.inserted_entities.consumer).id,
+      username = "username_random"..r,
+      password = "password_random"..r
+    }
+  elseif type == "keyauth_credential" then
+    return {
+      consumer_id = random_from_table(self.inserted_entities.consumer).id,
+      key = "key_random"..r
     }
   else
     error("Entity of type "..type.." cannot be generated.")
@@ -156,10 +161,9 @@ function Faker:seed(random_amount)
   end
 end
 
--- Insert entities in the DB using the DAO
--- First consumers and APIs, then the rest which needs references to created consumers and APIs
--- @param {table} entities_to_insert A table with the same structure as the one defined in :seed
--- @param {boolean} pick_relations If true, will pick relations from the __ property
+-- Insert entities in the DB using the DAO.
+-- @param `entities_to_insert` A table with the same structure as the one defined in `:seed()`
+-- @param `pick_relations`     If true, will pick relations from the __ properties (see fixtures)
 function Faker:insert_from_table(entities_to_insert, pick_relations)
   -- Insert in order (for foreign relashionships)
   -- 1. consumers and APIs
@@ -194,7 +198,9 @@ function Faker:insert_from_table(entities_to_insert, pick_relations)
       local dao_type = type=="plugin_configuration" and "plugins_configurations" or type.."s"
       local res, err = self.dao_factory[dao_type]:insert(entity)
       if err then
-        error("Faker failed to insert "..type.." entity: "..inspect(entity).."\n"..err)
+        local printable_mt = require "kong.tools.printable"
+        setmetatable(entity, printable_mt)
+        error("Faker failed to insert "..type.." entity: "..entity.."\n"..err)
       end
 
       -- For other hard-coded entities relashionships

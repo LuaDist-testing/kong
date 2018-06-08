@@ -1,19 +1,7 @@
 local utils = require "kong.tools.utils"
 local cjson = require "cjson"
 
-describe("Utils #tools", function()
-
-  describe("Stringy", function()
-
-    it("should work when using startsiwth", function()
-      local stringy = require "stringy"
-      assert.truthy(stringy.startswith("hello", "he"))
-      assert.falsy(stringy.startswith("hello", "HE"))
-      assert.falsy(stringy.startswith("hello", "wot"))
-      assert.truthy(stringy.startswith("hello", ""))
-    end)
-
-  end)
+describe("Utils", function()
 
   describe("Table utils", function()
 

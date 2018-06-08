@@ -6,6 +6,8 @@ local IO = require "kong.tools.io"
 local cutils = require "kong.cli.utils"
 local constants = require "kong.constants"
 local syslog = require "kong.tools.syslog"
+local stringy = require "stringy"
+local socket = require "socket"
 
 -- Cache config path, parsed config and DAO factory
 local kong_config_path
@@ -83,11 +85,25 @@ local function prepare_nginx_working_dir(args_config)
   os.execute("touch "..IO.path:join(kong_config.nginx_working_dir, "logs", "error.log"))
   os.execute("touch "..IO.path:join(kong_config.nginx_working_dir, "logs", "access.log"))
 
+   -- Check memory cache
+  if kong_config.memory_cache_size then
+    if tonumber(kong_config.memory_cache_size) == nil then
+      cutils.logger:error_exit("Invalid \"memory_cache_size\" setting")
+    elseif tonumber(kong_config.memory_cache_size) < 32 then
+      cutils.logger:error_exit("Invalid \"memory_cache_size\" setting: needs to be at least 32")
+    end
+  else
+    kong_config.memory_cache_size = 128 -- Default value
+    cutils.logger:warn("Setting \"memory_cache_size\" to default 128MB")
+  end
+  
   -- Extract nginx config from kong config, replace any needed value
   local nginx_config = kong_config.nginx
   local nginx_inject = {
     proxy_port = kong_config.proxy_port,
-    admin_api_port = kong_config.admin_api_port
+    admin_api_port = kong_config.admin_api_port,
+    dns_resolver = "127.0.0.1:"..kong_config.dnsmasq_port,
+    memory_cache_size = kong_config.memory_cache_size
   }
 
   -- Auto-tune
@@ -116,7 +132,6 @@ local function prepare_nginx_working_dir(args_config)
   -- Inject anonymous reports
   if kong_config.send_anonymous_reports then
     -- If there is no internet connection, disable this feature
-    local socket = require "socket"
     if socket.dns.toip(constants.SYSLOG.ADDRESS) then
       nginx_config = "error_log syslog:server="..constants.SYSLOG.ADDRESS..":"..tostring(constants.SYSLOG.PORT).." error;\n"..nginx_config
     else
@@ -137,7 +152,7 @@ local function prepare_database(args_config)
   local _, _, dao_factory = get_kong_config(args_config)
 
   -- Migrate the DB if needed and possible
-  local keyspace, err = dao_factory:get_migrations()
+  local keyspace, err = dao_factory.migrations:get_migrations()
   if err then
     cutils.logger:error_exit(err)
   elseif keyspace == nil then
@@ -153,13 +168,56 @@ local function prepare_database(args_config)
   end
 end
 
+local function stop_dnsmasq(kong_config)
+  local file_pid = kong_config.nginx_working_dir.."/"..constants.CLI.DNSMASQ_PID
+  if IO.file_exists(file_pid) then
+    local res, code = IO.os_execute("cat "..file_pid)
+    if code == 0 then
+      local _, kill_code = IO.kill_process_by_pid(res)
+      if kill_code and kill_code == 0 then
+        cutils.logger:info("dnsmasq stopped")
+      end
+    else
+      cutils.logger:error_exit(res)
+    end
+  end
+end
+
+local function start_dnsmasq(kong_config)
+  local cmd = IO.cmd_exists("dnsmasq") and "dnsmasq" or 
+                (IO.cmd_exists("/usr/local/sbin/dnsmasq") and "/usr/local/sbin/dnsmasq" or nil) -- On OS X dnsmasq is at /usr/local/sbin/
+  if not cmd then
+    cutils.logger:error_exit("Can't find dnsmasq")
+  end
+
+  -- Start the dnsmasq
+  local file_pid = kong_config.nginx_working_dir..(stringy.endswith(kong_config.nginx_working_dir, "/") and "" or "/")..constants.CLI.DNSMASQ_PID
+  local res, code = IO.os_execute(cmd.." -p "..kong_config.dnsmasq_port.." --pid-file="..file_pid)
+  if code ~= 0 then
+    cutils.logger:error_exit(res)
+  else
+    cutils.logger:info("dnsmasq started")
+  end
+end
+
 --
 -- PUBLIC
 --
 
 local _M = {}
 
-function _M.prepare_kong(args_config)
+-- Constants
+local START = "start"
+local RESTART = "restart"
+local RELOAD = "reload"
+local STOP = "stop"
+local QUIT = "quit"
+
+_M.RELOAD = RELOAD
+_M.STOP = STOP
+_M.QUIT = QUIT
+
+function _M.prepare_kong(args_config, signal)
   local kong_config = get_kong_config(args_config)
   local dao_config = kong_config.databases_available[kong_config.database].properties
 
@@ -169,15 +227,28 @@ function _M.prepare_kong(args_config)
   -- Print important informations
   cutils.logger:info(string.format([[Proxy port.........%s
        Admin API port.....%s
+       dnsmasq port.......%s
        Database...........%s %s
   ]],
   kong_config.proxy_port,
   kong_config.admin_api_port,
+  kong_config.dnsmasq_port,
   kong_config.database,
   tostring(dao_config)))
 
-  prepare_nginx_working_dir(args_config)
+  if not signal or (signal and signal ~= RELOAD) then
+    -- Check ports
+    local ports = { kong_config.proxy_port, kong_config.admin_api_port, kong_config.dnsmasq_port }
+    for _,port in ipairs(ports) do
+      if cutils.is_port_open(port) then
+        cutils.logger:error_exit("Port "..tostring(port).." is already being used by another process.")  
+      end
+    end
+  end
+
+  cutils.logger:info("Connecting to the database...")
   prepare_database(args_config)
+  prepare_nginx_working_dir(args_config, signal)
 end
 
 -- Send a signal to `nginx`. No signal will start the process
@@ -204,19 +275,35 @@ function _M.send_signal(args_config, signal)
                             constants.CLI.NGINX_PID,
                             signal ~= nil and "-s "..signal or "")
 
-  if not signal then signal = "start" end
-  if signal == "start" or signal == "restart" or signal == "reload" then
+  if not signal then signal = START end
+
+  if signal == START then
+    stop_dnsmasq(kong_config)
+    start_dnsmasq(kong_config)
+  end
+
+  if signal == STOP then
+    stop_dnsmasq(kong_config)
+  end
+
+  -- Check ulimit value
+  if signal == START or signal == RESTART or signal == RELOAD then
     local res, code = IO.os_execute("ulimit -n")
     if code == 0 and tonumber(res) < 4096 then
       cutils.logger:warn("ulimit is currently set to \""..res.."\". For better performance set it to at least \"4096\" using \"ulimit -n\"")
     end
   end
 
+  -- Check settings for anonymous reports
   if kong_config.send_anonymous_reports then
     syslog.log({signal=signal})
   end
 
-  return os.execute(cmd) == 0
+  local success = os.execute(cmd) == 0
+  if signal == START and not success then
+    stop_dnsmasq(kong_config)
+  end
+  return success
 end
 
 -- Test if Kong is already running by detecting a pid file.

@@ -5,6 +5,7 @@
 local IO = require "kong.tools.io"
 local Faker = require "kong.tools.faker"
 local Migrations = require "kong.tools.migrations"
+local Threads = require "llthreads2.ex"
 
 -- Constants
 local KONG_BIN = "bin/kong"
@@ -12,6 +13,8 @@ local DEFAULT_CONF_FILE = "kong.yml"
 local TEST_CONF_FILE = "kong_TEST.yml"
 local TEST_PROXY_URL = "http://localhost:8100"
 local TEST_API_URL = "http://localhost:8101"
+
+require "kong.tools.ngx_stub"
 
 local _M = {}
 
@@ -54,11 +57,11 @@ function _M.start_kong(conf_file, skip_wait)
   local result, exit_code = IO.os_execute(KONG_BIN.." start -c "..env.conf_file)
 
   if exit_code ~= 0 then
-    error("spec_helper cannot start kong: "..result)
+    error("spec_helper cannot start kong: \n"..result)
   end
 
   if not skip_wait then
-    os.execute("while ! [ -f "..env.configuration.pid_file.." ]; do sleep 1; done")
+    os.execute("while ! [ -f "..env.configuration.pid_file.." ]; do sleep 0.5; done")
   end
 
   return result, exit_code
@@ -72,9 +75,53 @@ function _M.stop_kong(conf_file)
     error("spec_helper cannot stop kong: "..result)
   end
 
-  os.execute("while [ -f "..env.configuration.pid_file.." ]; do sleep 1; done")
+  os.execute("while [ -f "..env.configuration.pid_file.." ]; do sleep 0.5; done")
 
   return result, exit_code
+end
+
+--
+-- TCP/UDP server helpers
+--
+
+-- Starts a TCP server
+--
+-- @param {number} port The port where the server will be listening to
+-- @return {thread} Returns a thread object
+function _M.start_tcp_server(port, ...)
+  local thread = Threads.new({
+    function(port)
+      local socket = require "socket"
+      local server = assert(socket.bind("*", port))
+      local client = server:accept()
+      local line, err = client:receive()
+      if not err then client:send(line .. "\n") end
+      client:close()
+      return line
+    end;
+  }, port)
+
+  thread:start(...)
+  return thread;
+end
+
+-- Starts a UDP server
+--
+-- @param {number} port The port where the server will be listening to
+-- @return {thread} Returns a thread object
+function _M.start_udp_server(port, ...)
+  local thread = Threads.new({
+    function(port)
+      local socket = require("socket")
+      udp = socket.udp()
+      udp:setsockname("*", port)
+      data = udp:receivefrom()
+      return data
+    end;
+  }, port)
+
+  thread:start(...)
+  return thread;
 end
 
 --

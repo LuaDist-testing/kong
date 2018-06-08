@@ -1,12 +1,10 @@
 local spec_helper = require "spec.spec_helpers"
 local http_client = require "kong.tools.http_client"
-local Threads = require "llthreads2.ex"
 local cjson = require "cjson"
 local yaml = require "yaml"
 local IO = require "kong.tools.io"
 local uuid = require "uuid"
 local stringy = require "stringy"
-local rex = require "rex_pcre"
 
 -- This is important to seed the UUID generator
 uuid.seed()
@@ -14,37 +12,8 @@ uuid.seed()
 local STUB_GET_URL = spec_helper.STUB_GET_URL
 local TEST_CONF = "kong_TEST.yml"
 
-local function start_tcp_server()
-  local thread = Threads.new({
-    function()
-      local socket = require "socket"
-      local server = assert(socket.bind("*", 7777))
-      local client = server:accept()
-      local line, err = client:receive()
-      if not err then client:send(line .. "\n") end
-      client:close()
-      return line
-    end;
-  })
-
-  thread:start()
-  return thread;
-end
-
-local function start_udp_server()
-  local thread = Threads.new({
-    function()
-      local socket = require("socket")
-      udp = socket.udp()
-      udp:setsockname("*", 8888)
-      data, ip, port = udp:receivefrom()
-      return data
-    end;
-  })
-
-  thread:start()
-  return thread;
-end
+local TCP_PORT = 7777
+local UDP_PORT = 8888
 
 describe("Logging Plugins", function()
 
@@ -61,10 +30,10 @@ describe("Logging Plugins", function()
   describe("Invalid API", function()
 
     it("should log to TCP", function()
-      local thread = start_tcp_server() -- Starting the mock TCP server
+      local thread = spec_helper.start_tcp_server(TCP_PORT) -- Starting the mock TCP server
 
       -- Making the request
-      local response, status, headers = http_client.get(STUB_GET_URL, {apikey = "apikey123"}, {host = "test1.com"})
+      local response, status, headers = http_client.get(STUB_GET_URL, nil, { host = "logging.com" })
       assert.are.equal(200, status)
 
       -- Getting back the TCP server input
@@ -78,10 +47,10 @@ describe("Logging Plugins", function()
     end)
 
     it("should log to UDP", function()
-      local thread = start_udp_server() -- Starting the mock TCP server
+      local thread = spec_helper.start_udp_server(UDP_PORT) -- Starting the mock TCP server
 
       -- Making the request
-      local response, status, headers = http_client.get(STUB_GET_URL, {apikey = "apikey123"}, {host = "test1.com"})
+      local response, status = http_client.get(STUB_GET_URL, nil, { host = "logging.com" })
       assert.are.equal(200, status)
 
       -- Getting back the TCP server input
@@ -95,13 +64,15 @@ describe("Logging Plugins", function()
     end)
 
     it("should log to file", function()
-      local uuid,_ = string.gsub(uuid(), "-", "")
+      local uuid = string.gsub(uuid(), "-", "")
 
       -- Making the request
-      local response, status, headers = http_client.get(STUB_GET_URL, {apikey = "apikey123"}, {host = "test1.com", file_log_uuid = uuid})
+      local response, status = http_client.get(STUB_GET_URL, nil,
+        { host = "logging.com", file_log_uuid = uuid }
+      )
       assert.are.equal(200, status)
 
-      -- Reading the log file and finding the entry
+      -- Reading the log file and finding the line with the entry
       local configuration = yaml.load(IO.read_file(TEST_CONF))
       assert.truthy(configuration)
       local error_log = IO.read_file(configuration.nginx_working_dir.."/logs/error.log")
@@ -115,22 +86,14 @@ describe("Logging Plugins", function()
       end
       assert.truthy(line)
 
-      -- Matching the Json
-      local iterator, iter_err = rex.gmatch(line, "\\s+({.+})\\s+")
-      if not iterator then
-        error(iter_err)
-      end
-      local m, err = iterator()
-      if err then
-        error(err)
-      end
-      assert.truthy(m)
+      -- Retrieve the JSON part of the line
+      local json_str = line:match("(%{.*%})")
+      assert.truthy(json_str)
 
-      local log_message = cjson.decode(m)
+      local log_message = cjson.decode(json_str)
       assert.are.same("127.0.0.1", log_message.ip)
       assert.are.same(uuid, log_message.request.headers.file_log_uuid)
     end)
 
   end)
-
 end)

@@ -24,14 +24,17 @@ describe("Static files", function()
       local file_content = IO.read_file(rockspec_path)
       local res = file_content:match("\"+[0-9.-]+[a-z]*[0-9-]*\"+")
       local extracted_version = res:sub(2, res:len() - 1)
-      assert.are.same(constants.VERSION, extracted_version)
+      assert.are.same(constants.ROCK_VERSION, extracted_version)
+
+      local dash = string.find(extracted_version, "-")
+      assert.are.same(constants.VERSION, dash and extracted_version:sub(1, dash - 1) or extracted_version)
     end)
 
   end)
 
   describe("Configuration", function()
 
-    it("should parse a correct configuration", function()
+    it("should equal to this template to make sure no errors are pushed in the default config", function()
       local configuration = IO.read_file(spec_helper.DEFAULT_CONF_FILE)
 
       assert.are.same([[
@@ -50,6 +53,7 @@ nginx_working_dir: /usr/local/kong/
 
 proxy_port: 8000
 admin_api_port: 8001
+dnsmasq_port: 8053
 
 # Specify the DAO to use
 database: cassandra
@@ -62,7 +66,7 @@ databases_available:
       port: 9042
       timeout: 1000
       keyspace: kong
-      keepalive: 60000
+      keepalive: 60000 # in milliseconds
 
 # Cassandra cache configuration
 database_cache_expiration: 5 # in seconds
@@ -70,7 +74,8 @@ database_cache_expiration: 5 # in seconds
 # Sends anonymous error reports
 send_anonymous_reports: true
 
-nginx_plus_status: false
+# In-memory cache size (MB)
+memory_cache_size: 128
 
 # Nginx configuration
 nginx: |
@@ -88,7 +93,7 @@ nginx: |
   }
 
   http {
-    resolver 8.8.8.8;
+    resolver {{dns_resolver}};
     charset UTF-8;
 
     access_log logs/access.log;
@@ -127,7 +132,7 @@ nginx: |
     lua_code_cache on;
     lua_max_running_timers 4096;
     lua_max_pending_timers 16384;
-    lua_shared_dict cache 512m;
+    lua_shared_dict cache {{memory_cache_size}}m;
     lua_socket_log_errors off;
 
     init_by_lua '
@@ -175,8 +180,8 @@ nginx: |
       location = /500.html {
         internal;
         content_by_lua '
-          local utils = require "kong.tools.utils"
-          utils.show_error(ngx.status, "Oops, an unexpected error occurred!")
+          local responses = require "kong.tools.responses"
+          responses.send_HTTP_INTERNAL_SERVER_ERROR("Oops, an unexpected error occurred!")
         ';
       }
     }

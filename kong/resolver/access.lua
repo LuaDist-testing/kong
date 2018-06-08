@@ -1,6 +1,7 @@
-local stringy = require "stringy"
 local url = require("socket.url")
 local cache = require "kong.tools.database_cache"
+local stringy = require "stringy"
+local responses = require "kong.tools.responses"
 
 local _M = {}
 
@@ -11,14 +12,14 @@ local function get_backend_url(api)
   local len = string.len(result)
   if string.sub(result, len, len) == "/" then
     -- Remove one slash to avoid having a double slash
-    -- Because ngx.var.uri always starts with a slash
+    -- Because ngx.var.request_uri always starts with a slash
     result = string.sub(result, 0, len - 1)
   end
 
   return result
 end
 
-local function get_host_header(val)
+local function get_host_from_url(val)
   local parsed_url = url.parse(val)
 
   local port
@@ -36,33 +37,43 @@ local function skip_authentication(headers)
   return headers["expect"] and stringy.startswith(headers["expect"], "100")
 end
 
+-- Retrieve the API from the Host that has been requested
 function _M.execute(conf)
-  -- Retrieving the API from the Host that has been requested
-  local host = stringy.strip(stringy.split(ngx.var.http_host, ":")[1])
-
-  local api = cache.get_and_set(cache.api_key(host), function()
-    local apis, err = dao.apis:find_by_keys({public_dns = host})
-    if err then
-      ngx.log(ngx.ERR, tostring(err))
-      utils.show_error(500, tostring(err))
-    elseif not apis or #apis == 0 then
-      utils.not_found("API not found")
-    end
-    return apis[1]
-  end)
-
-  -- Setting the backend URL for the proxy_pass directive
-  ngx.var.backend_url = get_backend_url(api) .. ngx.var.request_uri
-
-  ngx.req.set_header("host", get_host_header(ngx.var.backend_url))
-
-  -- There are some requests whose authentication needs to be skipped
-  if skip_authentication(ngx.req.get_headers()) then
-    return -- Returning and keeping the Lua code running to the next handler
+  local hosts = ngx.req.get_headers()["host"] -- Multiple "Host" can have been requested
+  if type(hosts) == "string" then
+    hosts = { hosts }
+  elseif not hosts then
+    hosts = {}
   end
 
-  -- Saving these properties for the other handlers, especially the log handler
-  ngx.ctx.api = api
+  -- Find the API
+  local api = nil
+  for _, host in ipairs(hosts) do
+    api = cache.get_and_set(cache.api_key(host), function()
+      local apis, err = dao.apis:find_by_keys { public_dns = host }
+      if err then
+        return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
+      elseif apis and #apis == 1 then
+        return apis[1]
+      end
+    end)
+    if api then break end
+  end
+
+  if not api then
+    return responses.send_HTTP_NOT_FOUND("API not found with Host: "..table.concat(hosts, ","))
+  end
+
+  -- Setting the backend URL for the proxy_pass directive
+  ngx.var.backend_url = get_backend_url(api)..ngx.var.request_uri
+
+  ngx.req.set_header("host", get_host_from_url(ngx.var.backend_url))
+
+  -- There are some requests whose authentication needs to be skipped
+  if not skip_authentication(ngx.req.get_headers()) then
+    -- Saving these properties for the other plugins handlers
+    ngx.ctx.api = api
+  end
 end
 
 return _M

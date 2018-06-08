@@ -9,6 +9,7 @@ local constants = require "kong.constants"
 local Object = require "classic"
 local lpath = require "luarocks.path"
 local IO = require "kong.tools.io"
+local socket = require "socket"
 
 --
 -- Colors
@@ -67,7 +68,7 @@ local logger = Logger()
 -- Luarocks
 --
 local function get_kong_infos()
-  return { name = constants.NAME, version = constants.VERSION }
+  return { name = constants.NAME, version = constants.ROCK_VERSION }
 end
 
 local function get_luarocks_dir()
@@ -122,10 +123,21 @@ local function get_kong_config_path(args_config)
   return config_path
 end
 
+-- Checks if a port is open on localhost
+-- @param `port`  The port to check
+-- @return `open` True if open, false otherwise
+local function is_port_open(port)
+  local tcp = socket.tcp()
+  local ok = tcp:connect("127.0.0.1", port)
+  tcp:close()
+  return ok
+end
+
 return {
   colors = colors,
   logger = logger,
   get_kong_infos = get_kong_infos,
   get_kong_config_path = get_kong_config_path,
-  get_luarocks_install_dir = get_luarocks_install_dir
+  get_luarocks_install_dir = get_luarocks_install_dir,
+  is_port_open = is_port_open
 }

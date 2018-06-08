@@ -1,4 +1,3 @@
-local rex = require "rex_pcre"
 local utils = require "kong.tools.utils"
 local constants = require "kong.constants"
 
@@ -14,9 +13,6 @@ local LUA_TYPE_ALIASES = {
   [constants.DATABASE_TYPES.TIMESTAMP] = "number"
 }
 
---
--- Schemas
---
 local _M = {}
 
 -- Returns the proper Lua type from a schema type, handling aliases
@@ -43,7 +39,7 @@ function _M.validate(t, schema, is_update)
     -- Set default value for the field if given
     if t[column] == nil and v.default ~= nil then
       if type(v.default) == "function" then
-        t[column] = v.default()
+        t[column] = v.default(t)
       else
         t[column] = v.default
       end
@@ -72,7 +68,7 @@ function _M.validate(t, schema, is_update)
 
     -- Check field against a regex if specified
     elseif t[column] ~= nil and v.regex then
-      if not rex.match(t[column], v.regex) then
+      if not ngx.re.match(t[column], v.regex) then
         errors = utils.add_error(errors, column, column.." has an invalid value")
       end
 
@@ -112,7 +108,7 @@ function _M.validate(t, schema, is_update)
   end
 
   -- Check for unexpected fields in the entity
-  for k,v in pairs(t) do
+  for k, v in pairs(t) do
     if schema[k] == nil then
       errors = utils.add_error(errors, k, k.." is an unknown field")
     end
