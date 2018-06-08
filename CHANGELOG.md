@@ -1,9 +1,78 @@
 ## [Unreleased][unreleased]
 
-## [0.10.0] - 2016/03/07
+## [0.10.1] - 2017/03/27
+
+### Changed
+
+- :warning: Serf has been downgraded to version 0.7 in our distributions,
+  although versions up to 0.8.1 are still supported. This fixes a problem when
+  automatically detecting the first non-loopback private IP address, which was
+  defaulted to `127.0.0.1` in Kong 0.10.0. Greater versions of Serf can still
+  be used, but the IP address needs to be manually specified in the
+  `cluster_advertise` configuration property.
+- Admin API:
+  - Disable support for TLS/1.0.
+    [#2212](https://github.com/Mashape/kong/pull/2212)
+
+### Added
+
+- Admin API:
+  - Active targets can be pulled with `GET /upstreams/{name}/targets/active`.
+    [#2230](https://github.com/Mashape/kong/pull/2230)
+  - Provide a convenience endpoint to disable targets at:
+    `DELETE /upstreams/{name}/targets/{target}`.
+    Under the hood, this creates a new target with `weigth = 0` (the
+    correct way of disabling targets, which used to cause confusion).
+    [#2256](https://github.com/Mashape/kong/pull/2256)
+- Plugins:
+  - cors: Support for configuring multiple Origin domains.
+    [#2203](https://github.com/Mashape/kong/pull/2203)
+
+### Fixed
+
+- Use an LRU cache for Lua-land entities caching to avoid exhausting the Lua
+  VM memory in long-running instances.
+  [#2246](https://github.com/Mashape/kong/pull/2246)
+- Avoid potential deadlocks upon callback errors in the caching module for
+  database entities.
+  [#2197](https://github.com/Mashape/kong/pull/2197)
+- Relax multipart MIME type parsing. A space is allowed in between values
+  of the Content-Type header.
+  [#2215](https://github.com/Mashape/kong/pull/2215)
+- Admin API:
+  - Better handling of non-supported HTTP methods on endpoints of the Admin
+    API. In some cases this used to throw an internal error. Calling any
+    endpoint with a non-supported HTTP method now always returns `405 Method
+    Not Allowed` as expected.
+    [#2213](https://github.com/Mashape/kong/pull/2213)
+- CLI:
+  - Better error handling when missing Serf executable.
+    [#2218](https://github.com/Mashape/kong/pull/2218)
+  - Fix a bug in the `kong migrations` command that would prevent it to run
+    correctly.
+    [#2238](https://github.com/Mashape/kong/pull/2238)
+  - Trim list values specified in the configuration file.
+    [#2206](https://github.com/Mashape/kong/pull/2206)
+  - Align the default configuration file's values to the actual, hard-coded
+    default values to avoid confusion.
+    [#2254](https://github.com/Mashape/kong/issues/2254)
+- Plugins:
+  - hmac: Generate an HMAC secret value if none is provided.
+    [#2158](https://github.com/Mashape/kong/pull/2158)
+  - oauth2: Don't try to remove credential values from request bodies if the
+    MIME type is multipart, since such attemps would result in an error.
+    [#2176](https://github.com/Mashape/kong/pull/2176)
+  - ldap: This plugin should not be applied to a single Consumer, however, this
+    was not properly enforced. It is not impossible to apply this plugin to a
+    single Consumer (as per all authentication plugin).
+    [#2237](https://github.com/Mashape/kong/pull/2237)
+  - aws-lambda: Support for `us-west-2` region in schema.
+    [#2257](https://github.com/Mashape/kong/pull/2257)
+
+## [0.10.0] - 2017/03/07
 
 Kong 0.10 is one of most significant releases to this day. It ships with
-exciting new features that have been havily requested for the last few months,
+exciting new features that have been heavily requested for the last few months,
 such as load balancing, Cassandra 3.0 compatibility, Websockets support,
 internal DNS resolution (A and SRV records without Dnsmasq), and more flexible
 matching capabilities for APIs routing.
@@ -30,7 +99,7 @@ perform significantly better than any previous version.
 - :warning: Drop the Dnsmasq dependency. We now internally resolve both A and
   SRV DNS records.
   [#1587](https://github.com/Mashape/kong/pull/1587)
-- :warning: Dropping support for unsecure `TLS/1.0` and defaulting `Upgrade`
+- :warning: Dropping support for insecure `TLS/1.0` and defaulting `Upgrade`
   responses to `TLS/1.2`.
   [#2119](https://github.com/Mashape/kong/pull/2119)
 - Bump the compatible OpenResty version to `1.11.2.1` and `1.11.2.2`. Support
@@ -130,7 +199,7 @@ perform significantly better than any previous version.
   - Avoid double-prefixing migration error messages with the database name
     (PostgreSQL/Cassandra).
 - Plugins:
-  - Fix fault tolerancy logic and error reporting in rate-limiting plugins.
+  - Fix fault tolerance logic and error reporting in rate-limiting plugins.
   - CORS: Properly return `Access-Control-Allow-Credentials: false` if
     `Access-Control-Allow-Origin: *`.
     [#2104](https://github.com/Mashape/kong/pull/2104)
@@ -169,7 +238,7 @@ perform significantly better than any previous version.
 ### Fixed
 
 - Plugins:
-  - Fix fault tolerancy logic and error reporting in rate-limiting plugins.
+  - Fix fault tolerance logic and error reporting in rate-limiting plugins.
 
 ## [0.9.7] - 2016/12/21
 
@@ -878,7 +947,7 @@ This is a maintenance release including several bug fixes and usability improvem
 - DAO
   - Cassandra version bumped to 2.1.5
   - Support for Cassandra downtime. If Cassandra goes down and is brought back up, Kong will not need to restart anymore, statements will be re-prepared on-the-fly. This is part of an ongoing effort from [jbochi/lua-resty-cassandra#47](https://github.com/jbochi/lua-resty-cassandra/pull/47), [#146](https://github.com/Mashape/kong/pull/146) and [#187](https://github.com/Mashape/kong/pull/187).
-Queries effectued during the downtime will still be lost. [#11](https://github.com/Mashape/kong/pull/11)
+Queries effectuated during the downtime will still be lost. [#11](https://github.com/Mashape/kong/pull/11)
   - Leverage reused sockets. If the DAO reuses a socket, it will not re-set their keyspace. This should give a small but appreciable performance improvement. [#170](https://github.com/Mashape/kong/pull/170)
   - Cascade delete plugins configurations when deleting a Consumer or an API associated with it. [#107](https://github.com/Mashape/kong/pull/107)
   - Allow Cassandra hosts listening on different ports than the default. [#185](https://github.com/Mashape/kong/pull/185)
@@ -983,14 +1052,11 @@ First version running with Cassandra.
 - CLI `bin/kong` script.
 - Database migrations (using `db.lua`).
 
-<<<<<<< HEAD
-[unreleased]: https://github.com/mashape/kong/compare/0.9.9...next
+[unreleased]: https://github.com/mashape/kong/compare/0.10.1...next
+[0.10.1]: https://github.com/mashape/kong/compare/0.10.0...0.10.1
+[0.10.0]: https://github.com/mashape/kong/compare/0.9.9...0.10.0
 [0.9.9]: https://github.com/mashape/kong/compare/0.9.8...0.9.9
 [0.9.8]: https://github.com/mashape/kong/compare/0.9.7...0.9.8
-=======
-[unreleased]: https://github.com/mashape/kong/compare/0.10.0...next
-[0.10.0]: https://github.com/mashape/kong/compare/0.9.7...0.10.0
->>>>>>> release/0.10.0
 [0.9.7]: https://github.com/mashape/kong/compare/0.9.6...0.9.7
 [0.9.6]: https://github.com/mashape/kong/compare/0.9.5...0.9.6
 [0.9.5]: https://github.com/mashape/kong/compare/0.9.4...0.9.5
