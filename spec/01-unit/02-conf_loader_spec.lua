@@ -312,6 +312,17 @@ describe("Configuration loader", function()
       assert.True(helpers.path.isabs(conf.ssl_cert))
       assert.True(helpers.path.isabs(conf.ssl_cert_key))
     end)
+    it("honors path if provided even if a default file exists", function()
+      conf_loader.add_default_path("spec/fixtures/to-strip.conf")
+
+      finally(function()
+        package.loaded["kong.conf_loader"] = nil
+        conf_loader = require "kong.conf_loader"
+      end)
+
+      local conf = assert(conf_loader(helpers.test_conf_path))
+      assert.equal("postgres", conf.database)
+    end)
   end)
 
   describe("errors", function()
@@ -329,6 +340,28 @@ describe("Configuration loader", function()
       assert.is_nil(conf)
       assert.contains("cassandra_repl_strategy has", errors, true)
       assert.contains("ssl_cert must be specified", errors)
+    end)
+  end)
+
+  describe("remove_sensitive()", function()
+    it("replaces sensitive settings", function()
+      local conf = assert(conf_loader(nil, {
+        pg_password = "hide_me",
+        cassandra_password = "hide_me",
+        cluster_encrypt_key = "hide_me"
+      }))
+
+      local purged_conf = conf_loader.remove_sensitive(conf)
+      assert.not_equal("hide_me", purged_conf.pg_password)
+      assert.not_equal("hide_me", purged_conf.cassandra_password)
+      assert.not_equal("hide_me", purged_conf.cluster_encrypt_key)
+    end)
+    it("does not insert placeholder if no value", function()
+      local conf = assert(conf_loader())
+      local purged_conf = conf_loader.remove_sensitive(conf)
+      assert.is_nil(purged_conf.pg_password)
+      assert.is_nil(purged_conf.cassandra_password)
+      assert.is_nil(purged_conf.cluster_encrypt_key)
     end)
   end)
 end)

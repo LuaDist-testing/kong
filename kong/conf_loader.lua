@@ -99,6 +99,8 @@ local CONF_SENSITIVE = {
   cluster_encrypt_key = true
 }
 
+local CONF_SENSITIVE_PLACEHOLDER = "******"
+
 local typ_checks = {
   array = function(v) return type(v) == "table" end,
   string = function(v) return type(v) == "string" end,
@@ -219,7 +221,7 @@ local function overrides(k, default_v, file_conf, arg_conf)
   if env ~= nil then
     local to_print = env
     if CONF_SENSITIVE[k] then
-      to_print = "******"
+      to_print = CONF_SENSITIVE_PLACEHOLDER
     end
     log.debug('%s ENV found with "%s"', env_name, to_print)
     value = env
@@ -261,8 +263,9 @@ local function load(path, custom_conf)
   if path and not pl_path.exists(path) then
     -- file conf has been specified and must exist
     return nil, "no file at: "..path
-  else
-    -- try to look for a conf, but no big deal if none
+  elseif not path then
+    -- try to look for a conf in default locations, but no big
+    -- deal if none is found: we will use our defaults.
     for _, default_path in ipairs(DEFAULT_PATHS) do
       if pl_path.exists(default_path) then
         path = default_path
@@ -372,4 +375,22 @@ local function load(path, custom_conf)
   return setmetatable(conf, nil) -- remove Map mt
 end
 
-return load
+return setmetatable({
+  load = load,
+  add_default_path = function(path)
+    DEFAULT_PATHS[#DEFAULT_PATHS+1] = path
+  end,
+  remove_sensitive = function(conf)
+    local purged_conf = tablex.deepcopy(conf)
+    for k in pairs(CONF_SENSITIVE) do
+      if purged_conf[k] then
+        purged_conf[k] = CONF_SENSITIVE_PLACEHOLDER
+      end
+    end
+    return purged_conf
+  end
+}, {
+  __call = function(_, ...)
+    return load(...)
+  end
+})
