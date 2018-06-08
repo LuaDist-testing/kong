@@ -7,6 +7,7 @@ local Faker = require "kong.tools.faker"
 local Migrations = require "kong.tools.migrations"
 local Threads = require "llthreads2.ex"
 
+
 require "kong.tools.ngx_stub"
 
 local _M = {}
@@ -18,6 +19,7 @@ local TEST_PROXY_SSL_URL = "https://localhost:8543"
 _M.API_URL = "http://localhost:8101"
 _M.KONG_BIN = "bin/kong"
 _M.PROXY_URL = TEST_PROXY_URL
+_M.PROXY_SSL_URL = TEST_PROXY_SSL_URL
 _M.STUB_GET_URL = TEST_PROXY_URL.."/request"
 _M.STUB_GET_SSL_URL = TEST_PROXY_SSL_URL.."/request"
 _M.STUB_POST_URL = TEST_PROXY_URL.."/request"
@@ -79,6 +81,33 @@ end
 -- TCP/UDP server helpers
 --
 
+-- Finds an available port on the system
+-- @param `exclude` An array with the ports to exclude
+-- @return `number` The port number
+function _M.find_port(exclude)
+  local socket = require "socket"
+
+  if not exclude then exclude = {} end
+
+  -- Reserving ports to exclude
+  local servers = {}
+  for _, v in ipairs(exclude) do
+    table.insert(servers, assert(socket.bind("*", v)))
+  end
+
+  -- Finding an available port
+  local handle = io.popen([[(netstat  -atn | awk '{printf "%s\n%s\n", $4, $4}' | grep -oE '[0-9]*$'; seq 32768 61000) | sort -n | uniq -u | head -n 1]])
+  local result = handle:read("*a")
+  handle:close()
+
+  -- Closing the opened servers
+  for _, v in ipairs(servers) do
+    v:close()
+  end
+
+  return tonumber(result)
+end
+
 -- Starts a TCP server
 -- @param `port`    The port where the server will be listening to
 -- @return `thread` A thread object
@@ -127,7 +156,7 @@ function _M.start_http_server(port, ...)
       if err then
         error(err)
       end
-      
+
       client:send("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n")
       client:close()
       return lines

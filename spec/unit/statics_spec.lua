@@ -75,11 +75,16 @@ database: cassandra
 databases_available:
   cassandra:
     properties:
-      hosts: "localhost"
-      port: 9042
+      hosts:
+        - "localhost:9042"
       timeout: 1000
       keyspace: kong
       keepalive: 60000 # in milliseconds
+      # ssl: false
+      # ssl_verify: false
+      # ssl_certificate: "/path/to/cluster-ca-certificate.pem"
+      # user: cassandra
+      # password: cassandra
 
 ## Cassandra cache configuration
 database_cache_expiration: 5 # in seconds
@@ -153,6 +158,7 @@ nginx: |
     lua_shared_dict locks 100k;
     lua_shared_dict cache {{memory_cache_size}}m;
     lua_socket_log_errors off;
+    {{lua_ssl_trusted_certificate}}
 
     init_by_lua '
       kong = require "kong"
@@ -178,7 +184,8 @@ nginx: |
       location / {
         default_type 'text/plain';
 
-        # This property will be used later by proxy_pass
+        # These properties will be used later by proxy_pass
+        set $backend_host nil;
         set $backend_url nil;
 
         # Authenticate the user and load the API info
@@ -188,6 +195,7 @@ nginx: |
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $backend_host;
         proxy_pass $backend_url;
         proxy_pass_header Server;
 

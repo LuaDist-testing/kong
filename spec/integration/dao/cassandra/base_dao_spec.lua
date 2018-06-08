@@ -45,10 +45,10 @@ describe("Cassandra", function()
     spec_helper.prepare_db()
 
     -- Create a parallel session to verify the dao's behaviour
-    session = cassandra.new()
+    session = cassandra:new()
     session:set_timeout(configuration.cassandra.timeout)
 
-    local _, err = session:connect(configuration.cassandra.hosts, configuration.cassandra.port)
+    local _, err = session:connect(configuration.cassandra.hosts)
     assert.falsy(err)
 
     local _, err = session:set_keyspace("kong_tests")

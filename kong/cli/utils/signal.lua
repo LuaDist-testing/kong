@@ -4,6 +4,7 @@
 
 local IO = require "kong.tools.io"
 local cutils = require "kong.cli.utils"
+local ssl = require "kong.cli.utils.ssl"
 local constants = require "kong.constants"
 local syslog = require "kong.tools.syslog"
 local socket = require "socket"
@@ -84,7 +85,11 @@ local function prepare_nginx_working_dir(args_config)
   -- Create logs files
   os.execute("touch "..IO.path:join(kong_config.nginx_working_dir, "logs", "error.log"))
   os.execute("touch "..IO.path:join(kong_config.nginx_working_dir, "logs", "access.log"))
-
+  -- Create SSL folder if needed
+  local _, err = IO.path:mkdir(IO.path:join(kong_config.nginx_working_dir, "ssl"))
+  if err then
+    cutils.logger:error_exit(err)
+  end
   -- TODO: this is NOT the place to do this.
   -- @see https://github.com/Mashape/kong/issues/92 for configuration validation/defaults
   -- @see https://github.com/Mashape/kong/issues/217 for a better configuration file
@@ -101,7 +106,9 @@ local function prepare_nginx_working_dir(args_config)
     cutils.logger:warn("Setting \"memory_cache_size\" to default 128MB")
   end
 
-  local ssl_cert_path, ssl_key_path = cutils.get_ssl_cert_and_key(kong_config)
+  ssl.prepare_ssl(kong_config)
+  local ssl_cert_path, ssl_key_path = ssl.get_ssl_cert_and_key(kong_config)
+  local trusted_ssl_cert_path = kong_config.databases_available[kong_config.database].properties.ssl_certificate -- DAO ssl cert
 
   -- Extract nginx config from kong config, replace any needed value
   local nginx_config = kong_config.nginx
@@ -112,7 +119,8 @@ local function prepare_nginx_working_dir(args_config)
     dns_resolver = "127.0.0.1:"..kong_config.dnsmasq_port,
     memory_cache_size = kong_config.memory_cache_size,
     ssl_cert = ssl_cert_path,
-    ssl_key = ssl_key_path
+    ssl_key = ssl_key_path,
+    lua_ssl_trusted_certificate = trusted_ssl_cert_path ~= nil and "lua_ssl_trusted_certificate \""..trusted_ssl_cert_path.."\";" or ""
   }
 
   -- Auto-tune
@@ -314,7 +322,8 @@ function _M.is_running(args_config)
 
   if IO.file_exists(kong_config.pid_file) then
     local pid = IO.read_file(kong_config.pid_file)
-    if os.execute("kill -0 "..pid) == 0 then
+    local _, code = IO.os_execute("kill -0 "..pid)
+    if code == 0 then
       return true
     else
       cutils.logger:warn("It seems like Kong crashed the last time it was started!")

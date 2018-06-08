@@ -67,44 +67,19 @@ function CassandraFactory:drop()
   end
 end
 
--- Prepare all statements of collections `queries` property and put them
--- in a statements cache
---
--- Note:
--- Even if the BaseDAO's :_execute_kong_query() method support preparation of statements on-the-go,
--- this method should be called when Kong starts in order to detect any failure in advance
--- as well as test the connection to Cassandra.
---
--- @return error if any
-function CassandraFactory:prepare()
-  local function prepare_collection(collection, collection_queries)
-    local err
-    for stmt_name, collection_query in pairs(collection_queries) do
-      err = select(2, collection:prepare_stmt(collection_query))
-      if err then
-        error(err)
-      end
-    end
+function CassandraFactory:get_session_options()
+  local options = {
+    ssl = self._properties.ssl,
+    ssl_verify = self._properties.ssl_verify,
+    ca_file = self._properties.ssl_certificate -- in case of using luasocket
+  }
+
+  if self._properties.user and self._properties.password then
+    local PasswordAuthenticator = require "cassandra.authenticators.PasswordAuthenticator"
+    options.authenticator = PasswordAuthenticator(self._properties.user, self._properties.password)
   end
 
-  -- Check cassandra is accessible
-  local session = cassandra.new()
-  session:set_timeout(self._properties.timeout)
-  local ok, co_err = session:connect(self._properties.hosts, self._properties.port)
-  session:close()
-
-  if not ok then
-    return DaoError(co_err, constants.DATABASE_ERROR_TYPES.DATABASE)
-  end
-
-  for _, collection in pairs(self.daos) do
-    if collection.queries then
-      local status, err = pcall(function() prepare_collection(collection, collection.queries) end)
-      if not status then
-        return err
-      end
-    end
-  end
+  return options
 end
 
 -- Execute a string of queries separated by ;
@@ -114,10 +89,12 @@ end
 -- @return {string} error if any
 function CassandraFactory:execute_queries(queries, no_keyspace)
   local ok, err
-  local session = cassandra.new()
+  local session = cassandra:new()
   session:set_timeout(self._properties.timeout)
 
-  ok, err = session:connect(self._properties.hosts, self._properties.port)
+  local options = self:get_session_options()
+
+  ok, err = session:connect(self._properties.hosts, nil, options)
   if not ok then
     return DaoError(err, constants.DATABASE_ERROR_TYPES.DATABASE)
   end

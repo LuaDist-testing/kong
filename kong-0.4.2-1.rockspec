@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.4.1-1"
+version = "0.4.2-1"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.4.1-1",
+  tag = "0.4.2-1",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.4.1"
+--   tag = "0.4.2"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -27,7 +27,7 @@ dependencies = {
   "yaml ~> 1.1.1-1",
   "lapis ~> 1.1.0-1",
   "stringy ~> 0.4-1",
-  "kong-cassandra ~> 0.5-8",
+  "lua-cassandra ~> 0.3.5-0",
   "multipart ~> 0.1-3",
   "lua-path ~> 0.2.3-1",
   "lua-cjson ~> 2.1.0-1",
@@ -53,6 +53,7 @@ build = {
 
     ["kong.cli.utils"] = "kong/cli/utils/utils.lua",
     ["kong.cli.utils.dnsmasq"] = "kong/cli/utils/dnsmasq.lua",
+    ["kong.cli.utils.ssl"] = "kong/cli/utils/ssl.lua",
     ["kong.cli.utils.signal"] = "kong/cli/utils/signal.lua",
     ["kong.cli.utils.input"] = "kong/cli/utils/input.lua",
     ["kong.cli.db"] = "kong/cli/db.lua",
@@ -189,5 +190,5 @@ build = {
     conf = { "kong.yml" },
     bin = { "bin/kong" }
   },
-  copy_directories = { "database/migrations/", "ssl" }
+  copy_directories = { "database/migrations/" }
 }

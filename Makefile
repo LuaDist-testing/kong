@@ -51,16 +51,16 @@ lint:
 	@find kong spec -name '*.lua' ! -name 'invalid-module.lua' | xargs luacheck -q
 
 test:
-	@busted spec/unit
+	@busted -v spec/unit
 
 test-integration:
-	@busted spec/integration
+	@busted -v spec/integration
 
 test-plugins:
-	@busted spec/plugins
+	@busted -v spec/plugins
 
 test-all:
-	@busted spec/
+	@busted -v spec/
 
 coverage:
 	@rm -f luacov.*

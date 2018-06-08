@@ -9,6 +9,7 @@ local http_client = require "kong.tools.http_client"
 
 local STUB_GET_URL = spec_helper.STUB_GET_URL
 local STUB_GET_SSL_URL = spec_helper.STUB_GET_SSL_URL
+local PROXY_URL = spec_helper.PROXY_URL
 
 -- Parses an SSL certificate returned by LuaSec
 local function parse_cert(cert)
@@ -27,12 +28,15 @@ describe("Resolver", function()
       api = {
         {name = "tests host resolver 1", public_dns = "mockbin.com", target_url = "http://mockbin.com"},
         {name = "tests host resolver 2", public_dns = "mockbin-auth.com", target_url = "http://mockbin.com"},
-        {name = "tests path resolver", target_url = "http://mockbin.com", path = "/status/"},
-        {name = "tests stripped path resolver", target_url = "http://mockbin.com", path = "/mockbin/", strip_path = true},
+        {name = "tests path resolver", target_url = "http://mockbin.com", path = "/status"},
+        {name = "tests stripped path resolver", target_url = "http://mockbin.com", path = "/mockbin", strip_path = true},
         {name = "tests stripped path resolver with pattern characters", target_url = "http://mockbin.com", path = "/mockbin-with-pattern/", strip_path = true},
         {name = "tests deep path resolver", target_url = "http://mockbin.com", path = "/deep/path/", strip_path = true},
+        {name = "tests dup path resolver", target_url = "http://mockbin.com", path = "/har", strip_path = true},
         {name = "tests wildcard subdomain", target_url = "http://mockbin.com/status/200", public_dns = "*.wildcard.com"},
-        {name = "tests wildcard subdomain 2", target_url = "http://mockbin.com/status/201", public_dns = "wildcard.*"}
+        {name = "tests wildcard subdomain 2", target_url = "http://mockbin.com/status/201", public_dns = "wildcard.*"},
+        {name = "tests preserve host", public_dns = "httpbin-nopreserve.com", target_url = "http://httpbin.org"},
+        {name = "tests preserve host 2", public_dns = "httpbin-preserve.com", target_url = "http://httpbin.org", preserve_host = true}
       },
       plugin_configuration = {
         { name = "keyauth", value = {key_names = {"apikey"} }, __api = 2 }
@@ -49,7 +53,7 @@ describe("Resolver", function()
   describe("Inexistent API", function()
 
     it("should return Not Found when the API is not in Kong", function()
-      local response, status = http_client.get(spec_helper.STUB_GET_URL, nil, { host = "foo.com" })
+      local response, status = http_client.get(spec_helper.STUB_GET_URL, nil, {host = "foo.com"})
       assert.equal(404, status)
       assert.equal('{"public_dns":["foo.com"],"message":"API not found with these values","path":"\\/request"}\n', response)
     end)
@@ -59,7 +63,7 @@ describe("Resolver", function()
   describe("SSL", function()
 
     it("should work when calling SSL port", function()
-      local response, status = http_client.get(STUB_GET_SSL_URL, nil, { host = "mockbin.com" })
+      local response, status = http_client.get(STUB_GET_SSL_URL, nil, {host = "mockbin.com"})
       assert.equal(200, status)
       assert.truthy(response)
       local parsed_response = cjson.decode(response)
@@ -91,7 +95,7 @@ describe("Resolver", function()
 
       assert.same(6, utils.table_size(cert))
       assert.same("Kong", cert.organizationName)
-      assert.same("IT", cert.organizationalUnitName)
+      assert.same("IT Department", cert.organizationalUnitName)
       assert.same("US", cert.countryName)
       assert.same("California", cert.stateOrProvinceName)
       assert.same("San Francisco", cert.localityName)
@@ -146,6 +150,9 @@ describe("Resolver", function()
 
         local _, status = http_client.get(spec_helper.PROXY_URL.."/status/301")
         assert.equal(301, status)
+
+        local _, status = http_client.get(spec_helper.PROXY_URL.."/mockbin")
+        assert.equal(200, status)
       end)
 
       it("should not proxy when the path does not match the start of the request_uri", function()
@@ -175,12 +182,20 @@ describe("Resolver", function()
         assert.equal(200, status)
       end)
 
+      it("should not strip if the `path` pattern is repeated in the request_uri", function()
+        local response, status = http_client.get(spec_helper.PROXY_URL.."/har/har/of/request")
+        assert.equal(200, status)
+        local body = cjson.decode(response)
+        local upstream_url = body.log.entries[1].request.url
+        assert.equal("http://mockbin.com/har/of/request", upstream_url)
+      end)
+
     end)
 
     it("should return the correct Server and Via headers when the request was proxied", function()
       local _, status, headers = http_client.get(STUB_GET_URL, nil, { host = "mockbin.com"})
       assert.equal(200, status)
-      assert.equal("cloudflare-nginx", headers.server)
+      assert.equal("Cowboy", headers.server)
       assert.equal(constants.NAME.."/"..constants.VERSION, headers.via)
     end)
 
@@ -189,6 +204,24 @@ describe("Resolver", function()
       assert.equal(401, status)
       assert.equal(constants.NAME.."/"..constants.VERSION, headers.server)
       assert.falsy(headers.via)
+    end)
+
+  end)
+
+  describe("Preseve Host", function()
+
+    it("should not preserve the host (default behavior)", function()
+      local response, status = http_client.get(PROXY_URL.."/get", nil, { host = "httpbin-nopreserve.com"})
+      assert.equal(200, status)
+      local parsed_response = cjson.decode(response)
+      assert.equal("httpbin.org", parsed_response.headers["Host"])
+    end)
+
+    it("should preserve the host (default behavior)", function()
+      local response, status = http_client.get(PROXY_URL.."/get", nil, { host = "httpbin-preserve.com"})
+      assert.equal(200, status)
+      local parsed_response = cjson.decode(response)
+      assert.equal("httpbin-preserve.com", parsed_response.headers["Host"])
     end)
 
   end)
