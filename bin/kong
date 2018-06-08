@@ -1,0 +1,38 @@
+#!/usr/bin/env lua
+
+local cutils = require "kong.cli.utils"
+local infos = cutils.get_infos()
+local commands = {
+  db = "kong.cli.db",
+  stop = "kong.cli.stop",
+  start = "kong.cli.start",
+  config = "kong.cli.config",
+  version = "kong.cli.version",
+  restart = "kong.cli.restart"
+}
+
+local help_message = string.format([[
+Usage: kong <command>
+
+where <command> is one of:
+  start, stop, restart, config, db, version
+
+kong --help            print this message
+kong <command> --help  print the help message of a command
+
+%s@%s]], infos.name, infos.version)
+
+local cmd = arg[1]
+
+if not cmd then
+  print("Missing <command>\n\n"..help_message)
+  os.exit(1)
+elseif cmd == "-h" or cmd == "--help" then
+  print(help_message)
+  os.exit(0)
+elseif not commands[cmd] then
+  print("Invalid <command>: "..cmd.."\n\n"..help_message)
+  os.exit(1)
+end
+
+require(commands[cmd])
