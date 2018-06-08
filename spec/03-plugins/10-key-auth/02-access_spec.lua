@@ -67,6 +67,33 @@ describe("Plugin: key-auth (access)", function()
       }
     })
 
+    local api5 = assert(helpers.dao.apis:insert {
+      name = "api-5",
+      hosts = { "key-auth5.com" },
+      upstream_url = "http://mockbin.com"
+    })
+    assert(helpers.dao.plugins:insert {
+      name = "key-auth",
+      api_id = api5.id,
+      config = {
+        key_in_body = true,
+      }
+    })
+
+    local api6 = assert(helpers.dao.apis:insert {
+      name = "api-6",
+      hosts = { "key-auth6.com" },
+      upstream_url = "http://mockbin.com"
+    })
+    assert(helpers.dao.plugins:insert {
+      name = "key-auth",
+      api_id = api6.id,
+      config = {
+        key_in_body = true,
+        hide_credentials = true,
+      }
+    })
+
     assert(helpers.start_kong())
     client = helpers.proxy_client()
   end)
@@ -86,7 +113,7 @@ describe("Plugin: key-auth (access)", function()
       })
       local body = assert.res_status(401, res)
       local json = cjson.decode(body)
-      assert.same({ message = "No API key found in headers or querystring" }, json)
+      assert.same({ message = "No API key found in request" }, json)
     end)
     it("returns WWW-Authenticate header on missing credentials", function()
       local res = assert(client:send {
@@ -138,6 +165,60 @@ describe("Plugin: key-auth (access)", function()
     end)
   end)
 
+  describe("key in request body", function()
+    for _, type in pairs({ "application/www-form-urlencoded", "application/json", "multipart/form-data" }) do
+      describe(type, function()
+        it("authenticates valid credentials", function()
+          local res = assert(client:send {
+            path = "/request",
+            headers = {
+              ["Host"] = "key-auth5.com",
+              ["Content-Type"] = type,
+            },
+            body = {
+              apikey = "kong",
+            }
+          })
+          assert.res_status(200, res)
+        end)
+        it("returns 403 Forbidden on invalid key", function()
+          local res = assert(client:send {
+            path = "/status/200",
+            headers = {
+              ["Host"] = "key-auth5.com",
+              ["Content-Type"] = type,
+            },
+            body = {
+              apikey = "123",
+            }
+          })
+          local body = assert.res_status(403, res)
+          local json = cjson.decode(body)
+          assert.same({ message = "Invalid authentication credentials" }, json)
+        end)
+
+        -- lua-multipart doesn't currently handle duplicates in the same method
+        -- that json/form-urlencoded handlers do
+        local test = type == "multipart/form-data" and pending or it
+        test("handles duplicated key", function()
+          local res = assert(client:send {
+            path = "/status/200",
+            headers = {
+              ["Host"] = "key-auth5.com",
+              ["Content-Type"] = type,
+            },
+            body = {
+              apikey = { "kong", "kong" },
+            },
+          })
+          local body = assert.res_status(401, res)
+          local json = cjson.decode(body)
+          assert.same({ message = "Duplicate API key found" }, json)
+        end)
+      end)
+    end
+  end)
+
   describe("key in headers", function()
     it("authenticates valid credentials", function()
       local res = assert(client:send {
@@ -183,32 +264,85 @@ describe("Plugin: key-auth (access)", function()
   end)
 
   describe("config.hide_credentials", function()
-    it("false sends key to upstream", function()
-      local res = assert(client:send {
-        method = "GET",
-        path = "/request",
-        headers = {
-          ["Host"] = "key-auth1.com",
-          ["apikey"] = "kong"
+
+    local harness = {
+      queryString = {
+        {
+          headers = { Host = "key-auth1.com" },
+          path = "/request?apikey=kong",
+          method = "GET",
+        },
+        {
+          headers = { Host = "key-auth2.com" },
+          path = "/request?apikey=kong",
+          method = "GET",
         }
-      })
-      local body = assert.res_status(200, res)
-      local json = cjson.decode(body)
-      assert.equal("kong", json.headers.apikey)
-    end)
-    it("true doesn't send key to upstream", function()
-      local res = assert(client:send {
-        method = "GET",
-        path = "/request",
-        headers = {
-          ["Host"] = "key-auth2.com",
-          ["apikey"] = "kong"
+      },
+      headers = {
+        {
+          headers = { Host = "key-auth1.com", ["apikey"] = "kong" },
+          path = "/request",
+          method = "GET",
+        },
+        {
+          headers = { Host = "key-auth2.com", ["apikey"] = "kong" },
+          path = "/request",
+          method = "GET",
         }
-      })
-      local body = assert.res_status(200, res)
-      local json = cjson.decode(body)
-      assert.is_nil(json.headers.apikey)
-    end)
+      },
+      postData = {
+        {
+          headers = { ["Host"] = "key-auth5.com", ["Content-Type"] = "application/www-form-urlencoded" },
+          body = { apikey = "kong" },
+          method = "POST",
+          path = "/request",
+        },
+        {
+          headers = { ["Host"] = "key-auth6.com", ["Content-Type"] = "application/www-form-urlencoded" },
+          body = { apikey = "kong" },
+          method = "POST",
+          path = "/request",
+        }
+      }
+    }
+
+    for type, _ in pairs(harness) do
+      describe(type, function()
+        it("false sends key to upstream", function()
+          local res = assert(client:send(harness[type][1]))
+          local body = assert.res_status(200, res)
+          local json = cjson.decode(body)
+
+          -- small workaround for how mockbin sends body data
+          local field
+          if type == "postData" then
+            local t = json[type].text:sub(8)
+            field = { apikey = t ~= "" and t or nil }
+
+          else
+            field = json[type]
+          end
+
+          assert.equal("kong", field.apikey)
+        end)
+        it("true doesn't send key to upstream", function()
+          local res = assert(client:send(harness[type][2]))
+          local body = assert.res_status(200, res)
+          local json = cjson.decode(body)
+
+          local field
+          if type == "postData" then
+            local t = json[type].text:sub(8)
+            field = { apikey = t ~= "" and t or nil }
+
+          else
+            field = json[type]
+          end
+
+          assert.is_nil(field.apikey)
+        end)
+      end)
+    end
   end)
 
   describe("config.anonymous", function()

@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.10.2-0"
+version = "0.10.3-0"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.10.2-0",
+  tag = "0.10.3-0",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.10.2"
+--   tag = "0.10.3"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -28,7 +28,7 @@ dependencies = {
   "multipart == 0.5",
   "version == 0.2",
   "lapis == 1.5.1",
-  "lua-cassandra == 1.2.1",
+  "lua-cassandra == 1.2.2",
   "pgmoon-mashape == 2.0.1",
   "luatz == 0.3",
   "lua_system_constants == 0.1.1",
@@ -36,7 +36,7 @@ dependencies = {
   "luacrypto == 0.3.2",
   "luasyslog == 1.0.0",
   "lua_pack == 1.0.4",
-  "lua-resty-dns-client == 0.4.1",
+  "lua-resty-dns-client == 0.4.2",
   "lua-resty-worker-events == 0.3.0",
 }
 build = {
@@ -87,6 +87,7 @@ build = {
     ["kong.api.routes.certificates"] = "kong/api/routes/certificates.lua",
     ["kong.api.routes.snis"] = "kong/api/routes/snis.lua",
 
+    ["kong.tools.ciphers"] = "kong/tools/ciphers.lua",
     ["kong.tools.dns"] = "kong/tools/dns.lua",
     ["kong.tools.utils"] = "kong/tools/utils.lua",
     ["kong.tools.public"] = "kong/tools/public.lua",
