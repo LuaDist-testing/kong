@@ -4,7 +4,7 @@
 -- NOTE: Before implementing a function here, consider if it will be used in many places
 -- across Kong. If not, a local function in the appropriate module is prefered.
 --
--- @copyright Copyright 2016-2017 Mashape Inc. All rights reserved.
+-- @copyright Copyright 2016-2017 Kong Inc. All rights reserved.
 -- @license [Apache 2.0](https://opensource.org/licenses/Apache-2.0)
 -- @module kong.tools.utils
 
@@ -266,7 +266,7 @@ do
   -- Supports multi-value query args, boolean values.
   -- It also supports encoding for bodies (only because it is used in http_client for specs.
   -- @TODO drop and use `ngx.encode_args` once it implements percent-encoding.
-  -- @see https://github.com/Mashape/kong/issues/749
+  -- @see https://github.com/Kong/kong/issues/749
   -- @param[type=table] args A key/value table containing the query args to encode.
   -- @param[type=boolean] raw If true, will not percent-encode any key/value and will ignore special boolean rules.
   -- @treturn string A valid querystring (without the prefixing '?')

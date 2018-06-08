@@ -62,8 +62,16 @@ end
 
 local function query_opts(self)
   local opts = self:clone_query_options()
-  opts.socket_type = forced_luasocket_phases[get_phase()] and
-                     "luasocket" or "nginx"
+
+  if ngx.IS_CLI or forced_luasocket_phases[get_phase()] then
+    -- Force LuaSocket usage in order to allow for self-signed certificates
+    -- to be trusted (via opts.cafile) in the resty-cli interpreter.
+    -- As usual, LuaSocket is also forced in non-supported cosocket contexts.
+    opts.socket_type = "luasocket"
+
+  else
+    opts.socket_type = "nginx"
+  end
 
   return opts
 end
@@ -338,7 +346,7 @@ local function deserialize_timestamps(self, row, schema)
   for k, v in pairs(schema.fields) do
     if v.type == "timestamp" and result[k] then
       local query = fmt([[
-        SELECT (extract(epoch from timestamp '%s')*1000)::bigint as %s;
+        SELECT (extract(epoch from timestamp '%s') * 1000) as %s;
       ]], result[k], k)
       local res, err = self:query(query)
       if not res then return nil, err
@@ -355,8 +363,8 @@ local function serialize_timestamps(self, tbl, schema)
   for k, v in pairs(schema.fields) do
     if v.type == "timestamp" and result[k] then
       local query = fmt([[
-        SELECT to_timestamp(%d/1000) at time zone 'UTC' as %s;
-      ]], result[k], k)
+        SELECT to_timestamp(%f) at time zone 'UTC' as %s;
+      ]], result[k] / 1000, k)
       local res, err = self:query(query)
       if not res then return nil, err
       elseif #res <= 1 then

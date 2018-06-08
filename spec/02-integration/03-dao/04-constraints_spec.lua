@@ -3,11 +3,11 @@ local Factory = require "kong.dao.factory"
 local utils = require "kong.tools.utils"
 
 local api_tbl = {
-  name = "mockbin",
-  hosts = { "mockbin.com" },
-  uris = { "/mockbin" },
-  strip_uri = true,
-  upstream_url = "https://mockbin.com"
+  name         = "example",
+  hosts        = { "example.com" },
+  uris         = { "/example" },
+  strip_uri    = true,
+  upstream_url = "https://example.com",
 }
 
 local plugin_tbl = {
@@ -45,7 +45,13 @@ helpers.for_each_dao(function(kong_config)
         assert.falsy(err)
         assert.is_table(plugin)
         assert.equal(api_fixture.id, plugin.api_id)
-        assert.same({hide_credentials = false, key_names = {"apikey"}, anonymous = "", key_in_body = false,}, plugin.config)
+        assert.same({
+            run_on_preflight = true,
+            hide_credentials = false,
+            key_names = {"apikey"},
+            anonymous = "",
+            key_in_body = false,
+          }, plugin.config)
       end)
       it("insert a valid plugin bis", function()
         plugin_fixture.api_id = api_fixture.id
@@ -55,8 +61,14 @@ helpers.for_each_dao(function(kong_config)
         assert.falsy(err)
         assert.is_table(plugin)
         assert.equal(api_fixture.id, plugin.api_id)
-        assert.same({hide_credentials = false, key_names = {"api-key"}, anonymous = "", key_in_body = false}, plugin.config)
-      end)
+        assert.same({
+            run_on_preflight = true,
+            hide_credentials = false,
+            key_names = {"api-key"},
+            anonymous = "",
+            key_in_body = false,
+          }, plugin.config)
+      end)		
       describe("unique per API/Consumer", function()
         it("API/Plugin", function()
           plugin_fixture.api_id = api_fixture.id
@@ -150,10 +162,10 @@ helpers.for_each_dao(function(kong_config)
       before_each(function()
         local err
         api_fixture, err = apis:insert {
-          name = "to-delete",
-          hosts = { "to-delete.com" },
-          uris = { "/to-delete" },
-          upstream_url = "https://mockbin.com"
+          name         = "to-delete",
+          hosts        = { "to-delete.com" },
+          uris         = { "/to-delete" },
+          upstream_url = "https://example.com",
         }
         assert.falsy(err)
 

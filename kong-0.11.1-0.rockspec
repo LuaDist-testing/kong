@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.11.0-0"
+version = "0.11.1-0"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.11.0-0",
+  tag = "0.11.1-0",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
---   url = "git://github.com/Mashape/kong",
---   tag = "0.11.0"
+--   url = "git://github.com/Kong/kong",
+--   tag = "0.11.1"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -31,18 +31,18 @@ dependencies = {
   "pgmoon == 1.8.0",
   "luatz == 0.3",
   "lua_system_constants == 0.1.2",
-  "lua-resty-iputils == 0.2.1",
+  "lua-resty-iputils == 0.3.0",
   "luacrypto == 0.3.2",
   "luasyslog == 1.0.0",
   "lua_pack == 1.0.5",
-  "lua-resty-dns-client == 0.6.0",
+  "lua-resty-dns-client == 0.6.2",
   "lua-resty-worker-events == 0.3.0",
   "lua-resty-mediador == 0.1.2",
 }
 build = {
   type = "builtin",
   modules = {
-    ["kong"] = "kong/kong.lua",
+    ["kong"] = "kong/init.lua",
     ["kong.meta"] = "kong/meta.lua",
     ["kong.constants"] = "kong/constants.lua",
     ["kong.singletons"] = "kong/singletons.lua",

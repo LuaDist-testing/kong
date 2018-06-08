@@ -11,23 +11,23 @@ end
 local upstream_name = "my_upstream"
 
 describe("Admin API", function()
-  
+
   local client, upstream
   local weight_default, weight_min, weight_max = 100, 0, 1000
   local default_port = 8000
-  
+
   before_each(function()
     helpers.run_migrations()
     assert(helpers.start_kong())
     client = assert(helpers.admin_client())
-    
+
     upstream = assert(helpers.dao.upstreams:insert {
       name = upstream_name,
       slots = 10,
       orderlist = { 1,2,3,4,5,6,7,8,9,10 }
     })
   end)
-  
+
   after_each(function()
     if client then client:close() end
     helpers.stop_kong()
@@ -92,11 +92,11 @@ describe("Admin API", function()
         local history = assert(helpers.dao.targets:find_all {
           upstream_id = upstream.id,
         })
-        -- there should be 2 left; 1 from the cleanup, and the final one 
+        -- there should be 2 left; 1 from the cleanup, and the final one
         -- inserted that triggered the cleanup
         assert.equal(2, #history)
       end)
-      
+
       describe("errors", function()
         it("handles malformed JSON body", function()
           local res = assert(client:request {
@@ -136,7 +136,7 @@ describe("Admin API", function()
             body = assert.response(res).has.status(400)
             local json = cjson.decode(body)
             assert.same({ message = "Invalid target; not a valid hostname or ip address" }, json)
-            
+
             -- Invalid weight parameter
             res = assert(client:send {
               method = "POST",
@@ -152,7 +152,7 @@ describe("Admin API", function()
             assert.same({ message = "weight must be from 0 to 1000" }, json)
           end
         end)
-        
+
         for _, method in ipairs({"PUT", "PATCH", "DELETE"}) do
           it_content_types("returns 405 on " .. method, function(content_type)
             return function()
@@ -181,7 +181,7 @@ describe("Admin API", function()
           })
         end
       end)
-    
+
       it("retrieves the first page", function()
         local res = assert(client:send {
           methd = "GET",
@@ -245,7 +245,7 @@ describe("Admin API", function()
 
       describe("empty results", function()
         local upstream_name2 = "getkong.org"
-        
+
         before_each(function()
           assert(helpers.dao.upstreams:insert {
             name = upstream_name2,
@@ -253,7 +253,7 @@ describe("Admin API", function()
             orderlist = { 1,2,3,4,5,6,7,8,9,10 }
           })
         end)
-        
+
         it("data property is an empty array", function()
           local res = assert(client:send {
             method = "GET",
@@ -291,6 +291,7 @@ describe("Admin API", function()
 
         for i = 1, #weights do
           for j = 1, #weights[i] do
+            ngx.sleep(0.01)
             apis[i] = assert(helpers.dao.targets:insert {
               target = "api-" .. tostring(i) .. ":80",
               weight = weights[i][j],
@@ -300,37 +301,27 @@ describe("Admin API", function()
         end
       end)
 
-      it("#ci only shows active targets", function()
-        -- Pending (as of 2017/07/26) (CI-only)
-        -- This test is failing to often on Travis CI because of the eventual
-        -- consistency of the 3 C* nodes running on Travis (gossip seems to be
-        -- to slow)
-        -- Current failure (the UUID comparison fails as well sometimes) is:
-        --[[
-          spec/02-integration/04-admin_api/08-targets_routes_spec.lua:311: Expected objects to be equal.
-          Passed in:
-          (number) 2
-          Expected:
-          (number) 3
-        --]]
-        local res = assert(client:send {
-          method = "GET",
-          path = "/upstreams/" .. upstream_name3 .. "/targets/active/",
-        })
-        assert.response(res).has.status(200)
-        local json = assert.response(res).has.jsonbody()
+      it("only shows active targets", function()
+        for _, append in ipairs({ "", "/" }) do
+          local res = assert(client:send {
+            method = "GET",
+            path = "/upstreams/" .. upstream_name3 .. "/targets/active" .. append,
+          })
+          assert.response(res).has.status(200)
+          local json = assert.response(res).has.jsonbody()
 
-        -- we got three active targets for this upstream
-        assert.equal(3, #json.data)
-        assert.equal(3, json.total)
+          -- we got three active targets for this upstream
+          assert.equal(3, #json.data)
+          assert.equal(3, json.total)
 
-        -- when multiple active targets are present, we only see the last one
-        assert.equal(apis[4].id, json.data[1].id)
+          -- when multiple active targets are present, we only see the last one
+          assert.equal(apis[4].id, json.data[1].id)
 
-        -- validate the remaining returned targets
-        -- note the backwards order, because we walked the targets backwards
-        assert.equal(apis[3].target, json.data[2].target)
-        assert.equal(apis[2].target, json.data[3].target)
+          -- validate the remaining returned targets
+          -- note the backwards order, because we walked the targets backwards
+          assert.equal(apis[3].target, json.data[2].target)
+          assert.equal(apis[2].target, json.data[3].target)
+        end
       end)
     end)
   end)
@@ -377,7 +368,7 @@ describe("Admin API", function()
 
         local active = assert(client:send {
           method = "GET",
-          path = "/upstreams/" .. upstream_name4 .. "/targets/active/",
+          path = "/upstreams/" .. upstream_name4 .. "/targets/active",
         })
         assert.response(active).has.status(200)
         json = assert.response(active).has.jsonbody()
@@ -404,7 +395,7 @@ describe("Admin API", function()
 
         local active = assert(client:send {
           method = "GET",
-          path = "/upstreams/" .. upstream_name4 .. "/targets/active/",
+          path = "/upstreams/" .. upstream_name4 .. "/targets/active",
         })
         assert.response(active).has.status(200)
         json = assert.response(active).has.jsonbody()

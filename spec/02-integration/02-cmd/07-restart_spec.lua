@@ -54,17 +54,20 @@ describe("kong restart", function()
     ngx.sleep(2)
 
     -- new server
-    local client = helpers.http_client("0.0.0.0", 9999, 5000)
+    local client = helpers.http_client(helpers.mock_upstream_host,
+                                       helpers.mock_upstream_port,
+                                       5000)
     local res = assert(client:send {
-      path = "/custom_server_path"
+      path = "/get",
     })
     assert.res_status(200, res)
     client:close()
   end)
-  pending("restarts with default configuration and prefix", function()
+  it("restarts with default configuration and prefix", function()
     -- don't want to force migrations to be run on default
     -- keyspace/database
     local env = {
+      prefix = helpers.test_conf.prefix,
       database = helpers.test_conf.database,
       pg_database = helpers.test_conf.pg_database,
       cassandra_keyspace = helpers.test_conf.cassandra_keyspace,

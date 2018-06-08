@@ -9,7 +9,7 @@ local POLL_INTERVAL = 0.3
 
 dao_helpers.for_each_dao(function(kong_conf)
 
-describe("core entities are invalidated with db: " .. kong_conf.database, function()
+describe("core entities are invalidated with db: #" .. kong_conf.database, function()
 
   local admin_client_1
   local admin_client_2
@@ -38,6 +38,7 @@ describe("core entities are invalidated with db: " .. kong_conf.database, functi
       admin_ssl             = false,
       db_update_frequency   = POLL_INTERVAL,
       db_update_propagation = db_update_propagation,
+      nginx_conf            = "spec/fixtures/custom_nginx.template",
     })
 
     assert(helpers.start_kong {
@@ -114,16 +115,16 @@ describe("core entities are invalidated with db: " .. kong_conf.database, functi
 
     it("on create", function()
       local admin_res = assert(admin_client_1:send {
-        method = "POST",
-        path   = "/apis",
-        body   = {
+        method  = "POST",
+        path    = "/apis",
+        body    = {
           name         = "example",
           hosts        = "example.com",
-          upstream_url = "http://httpbin.org",
+          upstream_url = helpers.mock_upstream_url,
         },
         headers = {
           ["Content-Type"] = "application/json",
-        }
+        },
       })
       assert.res_status(201, admin_res)
 
@@ -153,16 +154,16 @@ describe("core entities are invalidated with db: " .. kong_conf.database, functi
 
     it("on update", function()
       local admin_res = assert(admin_client_1:send {
-        method = "PATCH",
-        path   = "/apis/example",
-        body   = {
+        method  = "PATCH",
+        path    = "/apis/example",
+        body    = {
           name         = "example",
           hosts        = "example.com",
-          upstream_url = "http://httpbin.org/status/418",
+          upstream_url = helpers.mock_upstream_url .. "/status/418",
         },
         headers = {
           ["Content-Type"] = "application/json",
-        }
+        },
       })
       assert.res_status(200, admin_res)
 
@@ -249,6 +250,8 @@ describe("core entities are invalidated with db: " .. kong_conf.database, functi
       local cert_1 = get_cert(8443, "ssl-example.com")
       local cert_2 = get_cert(9443, "ssl-example.com")
 
+      -- if you get an error when running these, you likely have an outdated version of openssl installed
+      -- to update in osx: https://github.com/Kong/kong/pull/2776#issuecomment-320275043
       assert.matches("CN=localhost", cert_1, nil, true)
       assert.matches("CN=localhost", cert_2, nil, true)
     end)
@@ -424,12 +427,12 @@ describe("core entities are invalidated with db: " .. kong_conf.database, functi
       -- create API
 
       local admin_res = assert(admin_client_1:send {
-        method = "POST",
-        path   = "/apis",
-        body   = {
-          name  = "dummy-api",
-          hosts = "dummy.com",
-          upstream_url = "http://httpbin.org",
+        method  = "POST",
+        path    = "/apis",
+        body    = {
+          name         = "dummy-api",
+          hosts        = "dummy.com",
+          upstream_url = helpers.mock_upstream_url,
         },
         headers = {
           ["Content-Type"] = "application/json",
