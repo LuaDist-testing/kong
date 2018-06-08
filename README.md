@@ -10,7 +10,6 @@ Kong [was created](http://stackshare.io/mashape/how-mashape-manages-over-15-000-
 
 [![Gitter Badge][gitter-badge]][gitter-url]
 
-
 ## Summary
 
 - [**Features**](#features)
@@ -75,22 +74,31 @@ Kong comes in many shapes. While this repository contains its core's source code
 
 Resources:
 
+- [The story behind Kong](http://stackshare.io/mashape/how-mashape-manages-over-15-000-apis-microservices)
 - [Kong mentioned for the Empire PaaS](http://engineering.remind.com/introducing-empire/)
-- [Kong Getting Started Tutorials in Japanese](http://dev.classmethod.jp/etc/kong-api-aggregator/)
 - [Realtime API Management with Pushpin](http://blog.fanout.io/2015/07/14/realtime-api-management-pushpin-kong/)
-- [How to Create your own Plugin](http://streamdata.io/blog/developing-an-helloworld-kong-plugin/)
-- [Instaclustr Partners with Kong](https://www.instaclustr.com/instaclustr-partners-with-mashape-to-deliver-managed-cassandra-for-kong/)
-- [The story behind Kong](http://stackshare.io/mashape/how-mashape-manages-over-15-000-apis-microservice)
+- [How to create your own Kong plugin](http://streamdata.io/blog/developing-an-helloworld-kong-plugin/)
+- [Instaclustr partners with Kong](https://www.instaclustr.com/instaclustr-partners-with-mashape-to-deliver-managed-cassandra-for-kong/)
 - [How to deploy Kong on Azure](https://jeremiedevillard.wordpress.com/2015/10/12/deploy-kong-api-management-using-azure-resource-manager/)
+- [Kong intro in Portuguese](https://www.youtube.com/watch?v=0OIWr1yLs_4)
+- [Kong tutorial in Japanese 1](http://dev.classmethod.jp/etc/kong-api-aggregator/)
+- [Kong tutorial in Japanese 2](http://www.ryuzee.com/contents/blog/7048)
+
+Videos:
+
+- [VIDEO - Kong Demo in Portuguese](https://www.youtube.com/watch?v=0OIWr1yLs_4)
+- [VIDEO - OAuth2 with Kong](https://www.youtube.com/watch?v=nzySsFuV72M)
+- [VIDEO - Kong with Docker](https://www.youtube.com/watch?v=ME7MI2SwJ-E)
 
 Tools:
 
+- [Kongfig](https://github.com/mybuilder/kongfig)
 - [Kong on Tutum](https://github.com/Sillelien/docker-kong)
-- [Kong Admin GUI in JS](https://github.com/rsdevigo/jungle)
-- [Kong Admin GUI in Py](https://github.com/vikingco/django-kong-admin)
+- [Kong GUI in JS](https://github.com/rsdevigo/jungle)
+- [Kong GUI in Py](https://github.com/vikingco/django-kong-admin)
 - [Kong UI](https://github.com/msaraf/kong-ui)
 - [Chef Cookbook for Kong](https://github.com/zuazo/kong-cookbook)
-- [Python Client for Kong API](https://pypi.python.org/pypi/python-kong/)
+- [Python Client for Kong](https://pypi.python.org/pypi/python-kong/)
 - [Kong with Instaclustr](https://www.instaclustr.com/products/kong/)
 
 ## Roadmap
@@ -99,7 +107,7 @@ You can find a detailed Roadmap of Kong on the [Wiki](https://github.com/Mashape
 
 ## Development
 
-If you are planning on developing on Kong (writing your own plugin or contribute to the core), you'll need a development installation.
+If you are planning on developing on Kong (writing your own plugin or contribute to the core), you'll need a development installation. The `next` branch holds the latest unreleased source code.
 
 #### Vagrant
 
@@ -107,11 +115,13 @@ You can use a Vagrant box running Kong and Cassandra that you can find at [Masha
 
 #### Source Install
 
-First, you will need to already have Kong installed. Install Kong by following one of the methods described at [getkong.org/download](http://getkong.org/download). Then, make sure you have downloaded [Cassandra](http://cassandra.apache.org/download/) and that it is running. These steps will override your Kong installation with the latest source from the master branch:
+First, you will need to already have Kong installed. Install Kong by following one of the methods described at [getkong.org/download](http://getkong.org/download). Then, make sure you have downloaded [Cassandra](http://cassandra.apache.org/download/) and that it is running. These steps will override your Kong installation with the latest source code:
 
 ```shell
+# clone the repo and use the next branch
 $ git clone https://github.com/Mashape/kong
 $ cd kong/
+$ git checkout next
 
 # Build and install Kong globally using Luarocks, overriding the version previously installed
 $ [sudo] make install

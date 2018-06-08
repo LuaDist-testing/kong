@@ -76,7 +76,9 @@ local function get_redirect_uri(client_id)
 end
 
 local function is_https()
-  return ngx.var.scheme:lower() == "https"
+  local forwarded_proto_header = ngx.req.get_headers()["x-forwarded-proto"]
+
+  return ngx.var.scheme:lower() == "https" or (forwarded_proto_header and forwarded_proto_header:lower() == "https")
 end
 
 local function retrieve_parameters()
@@ -250,7 +252,7 @@ local function issue_token(conf)
         end
       elseif grant_type == GRANT_CLIENT_CREDENTIALS then
         -- Only check the provision_key if the authenticated_userid is being set
-        if parameters.authenticated_userid and conf.provision_key ~= parameters.provision_key then 
+        if parameters.authenticated_userid and conf.provision_key ~= parameters.provision_key then
           response_params = {[ERROR] = "invalid_provision_key", error_description = "Invalid Kong provision_key"}
         else
           -- Check scopes
@@ -412,7 +414,7 @@ function _M.execute(conf)
   ngx.req.set_header(constants.HEADERS.CONSUMER_USERNAME, consumer.username)
   ngx.req.set_header("x-authenticated-scope", token.scope)
   ngx.req.set_header("x-authenticated-userid", token.authenticated_userid)
-  ngx.ctx.authenticated_entity = credential
+  ngx.ctx.authenticated_credential = credential
 end
 
 return _M
