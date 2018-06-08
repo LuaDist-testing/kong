@@ -8,17 +8,19 @@ local Migrations = require "kong.tools.migrations"
 
 -- Constants
 local KONG_BIN = "bin/kong"
+local DEFAULT_CONF_FILE = "kong.yml"
 local TEST_CONF_FILE = "kong_TEST.yml"
 local TEST_PROXY_URL = "http://localhost:8100"
 local TEST_API_URL = "http://localhost:8101"
 
 local _M = {}
 
+_M.API_URL = TEST_API_URL
 _M.KONG_BIN = KONG_BIN
 _M.PROXY_URL = TEST_PROXY_URL
-_M.API_URL = TEST_API_URL
 _M.STUB_GET_URL = TEST_PROXY_URL.."/request"
 _M.STUB_POST_URL = TEST_PROXY_URL.."/request"
+_M.DEFAULT_CONF_FILE = DEFAULT_CONF_FILE
 _M.envs = {}
 
 -- When dealing with another configuration file for a few tests, this allows to add
@@ -47,18 +49,9 @@ end
 --
 -- OS and bin/kong helpers
 --
-function _M.os_execute(command)
-  local n = os.tmpname() -- get a temporary file name to store output
-  local exit_code = os.execute(command.." > "..n.." 2>&1")
-  local result = IO.read_file(n)
-  os.remove(n)
-
-  return result, exit_code / 256
-end
-
 function _M.start_kong(conf_file, skip_wait)
   local env = _M.get_env(conf_file)
-  local result, exit_code = _M.os_execute(KONG_BIN.." start -c "..env.conf_file)
+  local result, exit_code = IO.os_execute(KONG_BIN.." start -c "..env.conf_file)
 
   if exit_code ~= 0 then
     error("spec_helper cannot start kong: "..result)
@@ -73,7 +66,7 @@ end
 
 function _M.stop_kong(conf_file)
   local env = _M.get_env(conf_file)
-  local result, exit_code = _M.os_execute(KONG_BIN.." stop -c "..env.conf_file)
+  local result, exit_code = IO.os_execute(KONG_BIN.." stop -c "..env.conf_file)
 
   if exit_code ~= 0 then
     error("spec_helper cannot stop kong: "..result)
@@ -97,13 +90,20 @@ function _M.prepare_db(conf_file)
     end
   end)
 
-  -- 2. Prepare statements
+  -- 2. Drop just to be sure if the test suite previously crashed for ex
+  --    Otherwise we might try to insert already existing data.
+  local err = env.dao_factory:drop()
+  if err then
+    error(err)
+  end
+
+  -- 3. Prepare
   local err = env.dao_factory:prepare()
   if err then
     error(err)
   end
 
-  -- 3. Seed DB with our default data. This will throw any necessary error
+  -- 4. Seed DB with our default data. This will throw any necessary error
   env.faker:seed()
 end
 

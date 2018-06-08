@@ -29,6 +29,16 @@ describe("Http Client", function()
       assert.are.equal("pippo", parsed_response.headers.Custom)
     end)
 
+    it("should return a valid POST multipart response", function()
+      local response, status, headers = http_client.post_multipart("http://httpbin.org/post", {name = "Mark"}, {Custom = "pippo"})
+      assert.are.equal(200, status)
+      assert.truthy(headers)
+      assert.truthy(response)
+      local parsed_response = cjson.decode(response)
+      assert.are.equal("Mark", parsed_response.form.name)
+      assert.are.equal("pippo", parsed_response.headers.Custom)
+    end)
+
   end)
 
   describe("PUT", function()
@@ -55,6 +65,20 @@ describe("Http Client", function()
       local parsed_response = cjson.decode(response)
       assert.are.equal("Mark", parsed_response.args.name)
       assert.are.equal("pippo", parsed_response.headers.Custom)
+    end)
+
+  end)
+
+  describe("OPTIONS", function()
+
+    it("should return a valid OPTIONS response", function()
+      local response, status, headers = http_client.options("http://mockbin.com/request", {name = "Mark"}, {Custom = "pippo"})
+      assert.are.equal(200, status)
+      assert.truthy(headers)
+      assert.truthy(response)
+      local parsed_response = cjson.decode(response)
+      assert.are.equal("Mark", parsed_response.queryString.name)
+      assert.are.equal("pippo", parsed_response.headers.custom)
     end)
 
   end)
