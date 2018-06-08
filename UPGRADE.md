@@ -22,7 +22,25 @@ $ kong reload [-c configuration_file]
 
 **Reminder**: `kong reload` leverages the Nginx `reload` signal and seamlessly starts new workers taking over the old ones until they all have been terminated. This will guarantee you no drop in your current incoming traffic.
 
+## Upgrade to `0.7.x`
+
+If you are running a source installation, you will need to upgrade OpenResty to its `1.9.7.*` version. The good news is that this family of releases does not need to patch the NGINX core anymore to enable SSL support. If you install Kong from one of the distribution packages, they already include the appropriate OpenResty, simply download and install the appropriate package for your platform.
+
+As described in the Changelog, this upgrade has benefits, such as the SSL support and fixes for critical NGINX vulnerabilities, but also requires that you upgrade the `nginx` property of your Kong config, because it is not backwards compatible.
+
+- We advise that you retrieve the `nginx` property from the `0.7.x` configuration file, and use it in yours with the changes you feel are appropriate.
+
+- Finally, you can reload Kong as usual:
+
+```shell
+$ kong reload [-c configuration_file]
+```
+
+**Note**: We expose the underlying NGINX configuration as a way for Kong to be as flexible as possible and allow you to bend your NGINX instance to your needs. We are aware that many of you do not need to customize it and such changes should not affect you. Plans are to embed the NGINX configuration in Kong, while still allowing customization for the most demanding users. [#217](https://github.com/Mashape/kong/pull/217) is the place to discuss this and share thoughts/needs.
+
 ## Upgrade to `0.6.x`
+
+**Note**: if you are using Kong 0.4.x or earlier, you must first upgrade to Kong 0.5.x.
 
 The configuration file changed in this release. Make sure to check out the new default one and update it to your needs. In particular, make sure that:
 
@@ -127,7 +145,7 @@ $ git clone https://github.com/Mashape/kong.git
 $ cd kong/scripts
 
 # Install the Python script dependencies:
-$ pip install cassandra-driver pyyaml
+$ pip install cassandra-driver==2.7.2 pyyaml
 
 # The script will use the first Cassandra contact point in your Kong configuration file
 # (the first of the 'contact_points' property) so make sure it is valid and has the format 'host:port'.
