@@ -81,11 +81,15 @@ local function prepare_nginx_working_dir(args_config)
   if err then
     cutils.logger:error_exit(err)
   end
-
+  -- Create logs files
   os.execute("touch "..IO.path:join(kong_config.nginx_working_dir, "logs", "error.log"))
   os.execute("touch "..IO.path:join(kong_config.nginx_working_dir, "logs", "access.log"))
 
-   -- Check memory cache
+  -- TODO: this is NOT the place to do this.
+  -- @see https://github.com/Mashape/kong/issues/92 for configuration validation/defaults
+  -- @see https://github.com/Mashape/kong/issues/217 for a better configuration file
+
+  -- Check memory cache
   if kong_config.memory_cache_size then
     if tonumber(kong_config.memory_cache_size) == nil then
       cutils.logger:error_exit("Invalid \"memory_cache_size\" setting")
@@ -96,14 +100,19 @@ local function prepare_nginx_working_dir(args_config)
     kong_config.memory_cache_size = 128 -- Default value
     cutils.logger:warn("Setting \"memory_cache_size\" to default 128MB")
   end
-  
+
+  local ssl_cert_path, ssl_key_path = cutils.get_ssl_cert_and_key(kong_config)
+
   -- Extract nginx config from kong config, replace any needed value
   local nginx_config = kong_config.nginx
   local nginx_inject = {
     proxy_port = kong_config.proxy_port,
+    proxy_ssl_port = kong_config.proxy_ssl_port,
     admin_api_port = kong_config.admin_api_port,
     dns_resolver = "127.0.0.1:"..kong_config.dnsmasq_port,
-    memory_cache_size = kong_config.memory_cache_size
+    memory_cache_size = kong_config.memory_cache_size,
+    ssl_cert = ssl_cert_path,
+    ssl_key = ssl_key_path
   }
 
   -- Auto-tune
@@ -169,22 +178,15 @@ local function prepare_database(args_config)
 end
 
 local function stop_dnsmasq(kong_config)
-  local file_pid = kong_config.nginx_working_dir.."/"..constants.CLI.DNSMASQ_PID
-  if IO.file_exists(file_pid) then
-    local res, code = IO.os_execute("cat "..file_pid)
-    if code == 0 then
-      local _, kill_code = IO.kill_process_by_pid(res)
-      if kill_code and kill_code == 0 then
-        cutils.logger:info("dnsmasq stopped")
-      end
-    else
-      cutils.logger:error_exit(res)
-    end
+  local pid_file = kong_config.nginx_working_dir.."/"..constants.CLI.DNSMASQ_PID
+  local _, code = IO.kill_process_by_pid_file(pid_file)
+  if code and code == 0 then
+    cutils.logger:info("dnsmasq stopped")
   end
 end
 
 local function start_dnsmasq(kong_config)
-  local cmd = IO.cmd_exists("dnsmasq") and "dnsmasq" or 
+  local cmd = IO.cmd_exists("dnsmasq") and "dnsmasq" or
                 (IO.cmd_exists("/usr/local/sbin/dnsmasq") and "/usr/local/sbin/dnsmasq" or nil) -- On OS X dnsmasq is at /usr/local/sbin/
   if not cmd then
     cutils.logger:error_exit("Can't find dnsmasq")
@@ -236,19 +238,15 @@ function _M.prepare_kong(args_config, signal)
   kong_config.database,
   tostring(dao_config)))
 
-  if not signal or (signal and signal ~= RELOAD) then
-    -- Check ports
-    local ports = { kong_config.proxy_port, kong_config.admin_api_port, kong_config.dnsmasq_port }
-    for _,port in ipairs(ports) do
-      if cutils.is_port_open(port) then
-        cutils.logger:error_exit("Port "..tostring(port).." is already being used by another process.")  
-      end
-    end
-  end
-
   cutils.logger:info("Connecting to the database...")
   prepare_database(args_config)
   prepare_nginx_working_dir(args_config, signal)
+end
+
+local function check_port(port)
+  if cutils.is_port_open(port) then
+    cutils.logger:error_exit("Port "..tostring(port).." is already being used by another process.")
+  end
 end
 
 -- Send a signal to `nginx`. No signal will start the process
@@ -265,6 +263,14 @@ function _M.send_signal(args_config, signal)
   end
 
   local kong_config, kong_config_path = get_kong_config(args_config)
+  if not signal then signal = START end
+
+  if signal == START then
+    local ports = { kong_config.proxy_port, kong_config.proxy_ssl_port, kong_config.admin_api_port }
+    for _,port in ipairs(ports) do
+      check_port(port)
+    end
+  end
 
   -- Build nginx signal command
   local cmd = string.format("KONG_CONF=%s %s -p %s -c %s -g 'pid %s;' %s",
@@ -273,16 +279,14 @@ function _M.send_signal(args_config, signal)
                             kong_config.nginx_working_dir,
                             constants.CLI.NGINX_CONFIG,
                             constants.CLI.NGINX_PID,
-                            signal ~= nil and "-s "..signal or "")
+                            signal == START and "" or "-s "..signal)
 
-  if not signal then signal = START end
-
+  -- dnsmasq start/stop
   if signal == START then
     stop_dnsmasq(kong_config)
+    check_port(kong_config.dnsmasq_port)
     start_dnsmasq(kong_config)
-  end
-
-  if signal == STOP then
+  elseif signal == STOP or signal == QUIT then
     stop_dnsmasq(kong_config)
   end
 
@@ -294,15 +298,24 @@ function _M.send_signal(args_config, signal)
     end
   end
 
-  -- Check settings for anonymous reports
+  -- Report signal action
   if kong_config.send_anonymous_reports then
     syslog.log({signal=signal})
   end
 
+  -- Start failure handler
   local success = os.execute(cmd) == 0
+
   if signal == START and not success then
-    stop_dnsmasq(kong_config)
+    stop_dnsmasq(kong_config) -- If the start failed, then stop dnsmasq
   end
+
+  if signal == STOP and success then
+    if IO.file_exists(kong_config.pid_file) then
+      os.execute("while [ -f "..kong_config.pid_file.." ]; do sleep 0.1; done")
+    end
+  end
+
   return success
 end
 
@@ -324,6 +337,7 @@ function _M.is_running(args_config)
     if os.execute("kill -0 "..pid) == 0 then
       return true
     else
+      cutils.logger:warn("It seems like Kong crashed the last time it was started!")
       cutils.logger:info("Removing pid at: "..kong_config.pid_file)
       local _, err = os.remove(kong_config.pid_file)
       if err then

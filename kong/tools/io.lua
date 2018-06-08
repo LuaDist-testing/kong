@@ -33,10 +33,12 @@ end
 
 -- Kill a process by PID and wait until it's terminated
 -- @param `pid` the pid to kill
-function _M.kill_process_by_pid(pid)
-  local res, code = _M.os_execute("kill "..pid)
-  _M.os_execute("wait "..pid)
-  return res, code
+function _M.kill_process_by_pid_file(pid_file, signal)
+  if _M.file_exists(pid_file) then
+    local pid = stringy.strip(_M.read_file(pid_file))
+    local res, code = _M.os_execute("while kill -0 "..pid.." >/dev/null 2>&1; do kill "..(signal and "-"..tostring(signal).." " or "")..pid.."; sleep 0.1; done")
+    return res, code
+  end
 end
 
 function _M.read_file(path)
@@ -60,20 +62,36 @@ function _M.write_to_file(path, value)
   return true
 end
 
+function _M.file_size(path)
+  local file = io.open(path, "rb")
+  local size = file:seek("end")
+  file:close()
+  return size
+end
+
 function _M.retrieve_files(dir, options)
   local fs = require "luarocks.fs"
   local pattern = options.file_pattern
-  local exclude_dir_pattern = options.exclude_dir_pattern
+  local exclude_dir_patterns = options.exclude_dir_patterns
 
   if not pattern then pattern = "" end
-  if not exclude_dir_pattern then exclude_dir_pattern = "" end
+  if not exclude_dir_patterns then exclude_dir_patterns = {} end
   local files = {}
 
   local function tree(dir)
     for _, file in ipairs(fs.list_dir(dir)) do
       local f = path:join(dir, file)
-      if fs.is_dir(f) and string.match(f, exclude_dir_pattern) == nil then
-        tree(f)
+      if fs.is_dir(f) then
+        local is_ignored = false
+        for _, pattern in ipairs(exclude_dir_patterns) do
+          if string.match(f, pattern) then
+            is_ignored = true
+            break
+          end
+        end
+        if not is_ignored then
+          tree(f)
+        end
       elseif fs.is_file(f) and string.match(file, pattern) ~= nil then
         table.insert(files, f)
       end

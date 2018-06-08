@@ -5,6 +5,11 @@ local constants = require "kong.constants"
 
 local _M = {}
 
+local function skip_authentication(headers)
+  -- Skip upload request that expect a 100 Continue response
+  return headers["expect"] and stringy.startswith(headers["expect"], "100")
+end
+
 -- Fast lookup for credential retrieval depending on the type of the authentication
 --
 -- All methods must respect:
@@ -61,6 +66,7 @@ local function validate_credentials(credential, username, password)
 end
 
 function _M.execute(conf)
+  if not conf or skip_authentication(ngx.req.get_headers()) then return end
   if not conf then return end
 
   local username, password = retrieve_credentials(ngx.req, conf)
@@ -68,7 +74,7 @@ function _M.execute(conf)
 
   -- Make sure we are not sending an empty table to find_by_keys
   if username then
-    credential = cache.get_and_set(cache.basicauth_credential_key(username), function()
+    credential = cache.get_or_set(cache.basicauth_credential_key(username), function()
       local credentials, err = dao.basicauth_credentials:find_by_keys { username = username }
       local result
       if err then
@@ -85,7 +91,18 @@ function _M.execute(conf)
     return responses.send_HTTP_FORBIDDEN("Invalid authentication credentials")
   end
 
-  ngx.req.set_header(constants.HEADERS.CONSUMER_ID, credential.consumer_id)
+  -- Retrieve consumer
+  local consumer = cache.get_or_set(cache.consumer_key(credential.consumer_id), function()
+    local result, err = dao.consumers:find_one(credential.consumer_id)
+    if err then
+      return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
+    end
+    return result
+  end)
+
+  ngx.req.set_header(constants.HEADERS.CONSUMER_ID, consumer.id)
+  ngx.req.set_header(constants.HEADERS.CONSUMER_CUSTOM_ID, consumer.custom_id)
+  ngx.req.set_header(constants.HEADERS.CONSUMER_USERNAME, consumer.username)
   ngx.ctx.authenticated_entity = credential
 end
 

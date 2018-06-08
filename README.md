@@ -19,11 +19,12 @@ Kong was created to secure, manage and extend Microservices & APIs. Kong is powe
 - **Scalability**: Distributed by nature, Kong scales horizontally simply by adding nodes.
 - **Performance**: Kong handles load with ease by scaling and using NGINX at the core.
 - **Plugins**: Extendable architecture for adding functionality to Kong and APIs.
-  - **Logging**: Log requests and responses to your system over TCP, UDP or to disk.
+  - **Logging**: Log requests and responses to your system over HTTP, TCP, UDP or to disk.
+  - **SSL**: Setup a specific SSL certificate for an underlying service or API
   - **Monitoring**: Live monitoring provides key load and performance server metrics.
   - **Authentication**: Manage consumer credentials query string and header tokens.
-  - **Rate-limiting**: Block and throttle requests based on IP or authentication.
-  - **Transformations**: Add, remove or manipulate HTTP params and headers on-the-fly.
+  - **Rate-limiting**: Block and throttle requests based on IP, authentication or body size.
+  - **Transformations**: Add, remove or manipulate HTTP requests and responses.
   - **CORS**: Enable cross-origin requests to your APIs that would otherwise be blocked.
   - **Anything**: Need custom functionality? Extend Kong with your own Lua plugins!
 
@@ -39,7 +40,7 @@ We set Kong up on AWS and load tested it to get some performance metrics. The se
 
 Over two minutes **117,185** requests with an average latency of **10ms** at **976 requests a second** or about **84,373,200 requests a day** went through Kong and back with only a single timeout.
 
-![](http://i.imgur.com/aDGRe4G.png)
+![](http://cl.ly/image/3R171b2U2l3k/Image%202015-06-01%20at%205.00.13%20PM.png)
 
 ## Development
 
@@ -48,20 +49,24 @@ Over two minutes **117,185** requests with an average latency of **10ms** at **9
 
   This will build and install the `kong` luarock globally.
 
-3. Run `make dev`
+3. Delete the `/etc/kong` folder: `[sudo] rm -rf /etc/kong`
+
+  This is necessary just in case you have previously installed Kong with a package distribution.
+
+4. Run `make dev`
 
   This will install development dependencies and create your environment configuration files:
 
   - `kong_TESTS.yml`
   - `kong_DEVELOPMENT.yml`
 
-4. Run the tests:
+5. Run the tests:
 
   ```bash
   make test-all
   ```
 
-5. Run Kong with the development configuration file:
+6. Run Kong with the development configuration file:
 
    ```bash
    $ kong start -c kong_DEVELOPMENT.yml

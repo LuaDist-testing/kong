@@ -1,4 +1,4 @@
-local VERSION = "0.2.1"
+local VERSION = "0.3.0"
 
 return {
   NAME = "kong",
@@ -6,7 +6,8 @@ return {
   ROCK_VERSION = VERSION.."-1",
   SYSLOG = {
     ADDRESS = "kong-hf.mashape.com",
-    PORT = 61828
+    PORT = 61828,
+    API = "api"
   },
   CLI = {
     GLOBAL_KONG_CONF = "/etc/kong/kong.yml",
@@ -26,21 +27,16 @@ return {
     ID = "id",
     TIMESTAMP = "timestamp"
   },
+  -- Non standard headers, specific to Kong
   HEADERS = {
-    SERVER = "Server",
-    VIA = "Via",
-    CONTENT_TYPE = "Content-Type",
+    HOST_OVERRIDE = "X-Host-Override",
     PROXY_TIME = "X-Kong-Proxy-Time",
     API_TIME = "X-Kong-Api-Time",
     CONSUMER_ID = "X-Consumer-ID",
+    CONSUMER_CUSTOM_ID = "X-Consumer-Custom-ID",
+    CONSUMER_USERNAME = "X-Consumer-Username",
     RATELIMIT_LIMIT = "X-RateLimit-Limit",
     RATELIMIT_REMAINING = "X-RateLimit-Remaining"
-  },
-  CACHE = {
-    APIS = "apis",
-    PLUGINS_CONFIGURATIONS = "plugins_configurations",
-    BASICAUTH_CREDENTIAL = "basicauth_credentials",
-    KEYAUTH_CREDENTIAL = "keyauth_credentials"
   },
   AUTHENTICATION = {
     QUERY = "query",
