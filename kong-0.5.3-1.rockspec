@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.5.2-1"
+version = "0.5.3-1"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.5.2-1",
+  tag = "0.5.3-1",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.5.2"
+--   tag = "0.5.3"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
