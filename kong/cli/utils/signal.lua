@@ -166,15 +166,16 @@ local function prepare_database(args_config)
     cutils.logger:error_exit(err)
   elseif keyspace == nil then
     cutils.logger:info("Database not initialized. Running migrations...")
-    local migrations = require("kong.tools.migrations")(dao_factory, cutils.get_luarocks_install_dir())
-    migrations:migrate(function(migration, err)
-      if err then
-        cutils.logger:error_exit(err)
-      elseif migration then
-        cutils.logger:success("Migrated up to: "..cutils.colors.yellow(migration.name))
-      end
-    end)
   end
+
+  local migrations = require("kong.tools.migrations")(dao_factory, cutils.get_luarocks_install_dir())
+  migrations:migrate(function(migration, err)
+    if err then
+      cutils.logger:error_exit(err)
+    elseif migration then
+      cutils.logger:success("Migrated up to: "..cutils.colors.yellow(migration.name))
+    end
+  end)
 end
 
 local function stop_dnsmasq(kong_config)
@@ -312,7 +313,7 @@ function _M.send_signal(args_config, signal)
 
   if signal == STOP and success then
     if IO.file_exists(kong_config.pid_file) then
-      os.execute("while [ -f "..kong_config.pid_file.." ]; do sleep 0.1; done")
+      os.execute("while [ -f "..kong_config.pid_file.." ]; do sleep 0.5; done")
     end
   end
 
