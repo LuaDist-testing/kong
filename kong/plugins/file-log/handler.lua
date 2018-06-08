@@ -18,10 +18,7 @@ local oflags = bit.bor(O_WRONLY, O_CREAT, O_APPEND)
 local mode = bit.bor(S_IRUSR, S_IWUSR, S_IRGRP, S_IROTH)
 
 ffi.cdef[[
-int open(const char * filename, int flags, int mode);
 int write(int fd, const void * ptr, int numbytes);
-int close(int fd);
-char *strerror(int errnum);
 ]]
 
 -- fd tracking utility functions
@@ -32,12 +29,14 @@ local file_descriptors = {}
 -- @param `conf`     Configuration table, holds http endpoint details
 -- @param `message`  Message to be logged
 local function log(premature, conf, message)
-  if premature then return end
+  if premature then
+    return
+  end
 
-  local msg = cjson.encode(message).."\n"
+  local msg = cjson.encode(message) .. "\n"
 
   local fd = file_descriptors[conf.path]
-  
+
   if fd and conf.reopen then
     -- close fd, we do this here, to make sure a previously cached fd also
     -- gets closed upon dynamic changes of the configuration
@@ -61,7 +60,7 @@ end
 
 local FileLogHandler = BasePlugin:extend()
 
-FileLogHandler.PRIORITY = 1
+FileLogHandler.PRIORITY = 9
 
 function FileLogHandler:new()
   FileLogHandler.super.new(self, "file-log")

@@ -17,7 +17,7 @@ local function clean_history(upstream_id, dao_factory)
   if target_history then
     -- sort the targets
     for _,target in ipairs(target_history) do
-      target.order = target.created_at..":"..target.id
+      target.order = target.created_at .. ":" .. target.id
     end
 
     -- sort table in reverse order
@@ -83,7 +83,7 @@ return {
     end
   },
 
-  ["/upstreams/:name_or_id"] = {
+  ["/upstreams/:upstream_name_or_id"] = {
     before = function(self, dao_factory, helpers)
       crud.find_upstream_by_name_or_id(self, dao_factory, helpers)
     end,
@@ -101,7 +101,7 @@ return {
     end
   },
 
-  ["/upstreams/:name_or_id/targets/"] = {
+  ["/upstreams/:upstream_name_or_id/targets/"] = {
     before = function(self, dao_factory, helpers)
       crud.find_upstream_by_name_or_id(self, dao_factory, helpers)
       self.params.upstream_id = self.upstream.id
@@ -118,7 +118,7 @@ return {
     end,
   },
 
-  ["/upstreams/:name_or_id/targets/active"] = {
+  ["/upstreams/:upstream_name_or_id/targets/active/"] = {
     before = function(self, dao_factory, helpers)
       crud.find_upstream_by_name_or_id(self, dao_factory, helpers)
       self.params.upstream_id = self.upstream.id
@@ -137,7 +137,7 @@ return {
       --sort and walk based on target and creation time
       for _, target in ipairs(target_history) do
         target.order = target.target .. ":" ..
-          target.created_at .. ":" ..target.id
+          target.created_at .. ":" .. target.id
       end
       table.sort(target_history, function(a, b) return a.order > b.order end)
 
@@ -182,7 +182,7 @@ return {
     end
   },
 
-  ["/upstreams/:name_or_id/targets/:target_or_id"] = {
+  ["/upstreams/:upstream_name_or_id/targets/:target_or_id"] = {
     before = function(self, dao_factory, helpers)
       crud.find_upstream_by_name_or_id(self, dao_factory, helpers)
       crud.find_target_by_target_or_id(self, dao_factory, helpers)

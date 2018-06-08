@@ -8,6 +8,8 @@ describe("Plugin: tcp-log (log)", function()
   local client
 
   setup(function()
+    helpers.run_migrations()
+
     local api1 = assert(helpers.dao.apis:insert {
       name = "api-1",
       hosts = { "tcp_logging.com" },
@@ -16,7 +18,7 @@ describe("Plugin: tcp-log (log)", function()
     local api2 = assert(helpers.dao.apis:insert {
       name = "api-2",
       hosts = { "tcp_logging2.com" },
-      upstream_url = "http://127.0.0.1:"..HTTP_DELAY_PORT,
+      upstream_url = "http://127.0.0.1:" .. HTTP_DELAY_PORT,
     })
 
     assert(helpers.dao.plugins:insert {

@@ -24,6 +24,9 @@
 -- |[[    ]]|
 -- ==========
 
+require "luarocks.loader"
+require "resty.core"
+
 do
   -- let's ensure the required shared dictionaries are
   -- declared via lua_shared_dict in the Nginx conf
@@ -42,73 +45,69 @@ end
 
 require("kong.core.globalpatches")()
 
+local ip = require "kong.tools.ip"
 local dns = require "kong.tools.dns"
 local core = require "kong.core.handler"
-local Serf = require "kong.serf"
 local utils = require "kong.tools.utils"
-local Events = require "kong.core.events"
+local lapis = require "lapis"
 local responses = require "kong.tools.responses"
-local constants = require "kong.constants"
 local singletons = require "kong.singletons"
 local DAOFactory = require "kong.dao.factory"
+local kong_cache = require "kong.cache"
 local ngx_balancer = require "ngx.balancer"
 local plugins_iterator = require "kong.core.plugins_iterator"
 local balancer_execute = require("kong.core.balancer").execute
+local kong_cluster_events = require "kong.cluster_events"
+local kong_error_handlers = require "kong.core.error_handlers"
 
+local ngx              = ngx
+local header           = ngx.header
 local ipairs           = ipairs
+local assert           = assert
+local tostring         = tostring
 local get_last_failure = ngx_balancer.get_last_failure
 local set_current_peer = ngx_balancer.set_current_peer
 local set_timeouts     = ngx_balancer.set_timeouts
 local set_more_tries   = ngx_balancer.set_more_tries
 
-local function attach_hooks(events, hooks)
-  for k, v in pairs(hooks) do
-    events:subscribe(k, v)
-  end
-end
-
-local function load_plugins(kong_conf, dao, events)
+local function load_plugins(kong_conf, dao)
   local in_db_plugins, sorted_plugins = {}, {}
 
   ngx.log(ngx.DEBUG, "Discovering used plugins")
 
   local rows, err_t = dao.plugins:find_all()
-  if not rows then return nil, tostring(err_t) end
+  if not rows then
+    return nil, tostring(err_t)
+  end
 
   for _, row in ipairs(rows) do in_db_plugins[row.name] = true end
 
   -- check all plugins in DB are enabled/installed
   for plugin in pairs(in_db_plugins) do
     if not kong_conf.plugins[plugin] then
-      return nil, plugin.." plugin is in use but not enabled"
+      return nil, plugin .. " plugin is in use but not enabled"
     end
   end
 
   -- load installed plugins
   for plugin in pairs(kong_conf.plugins) do
-    local ok, handler = utils.load_module_if_exists("kong.plugins."..plugin..".handler")
+    local ok, handler = utils.load_module_if_exists("kong.plugins." .. plugin .. ".handler")
     if not ok then
-      return nil, plugin.." plugin is enabled but not installed;\n"..handler
+      return nil, plugin .. " plugin is enabled but not installed;\n" .. handler
     end
 
-    local ok, schema = utils.load_module_if_exists("kong.plugins."..plugin..".schema")
+    local ok, schema = utils.load_module_if_exists("kong.plugins." .. plugin .. ".schema")
     if not ok then
-      return nil, "no configuration schema found for plugin: "..plugin
+      return nil, "no configuration schema found for plugin: " .. plugin
     end
 
-    ngx.log(ngx.DEBUG, "Loading plugin: "..plugin)
+    ngx.log(ngx.DEBUG, "Loading plugin: " .. plugin)
 
     sorted_plugins[#sorted_plugins+1] = {
       name = plugin,
       handler = handler(),
       schema = schema
     }
-
-    -- Attaching hooks
-    local ok, hooks = utils.load_module_if_exists("kong.plugins."..plugin..".hooks")
-    if ok then
-      attach_hooks(events, hooks)
-    end
   end
 
   -- sort plugins by order of execution
@@ -124,7 +123,8 @@ local function load_plugins(kong_conf, dao, events)
     reports.toggle(true)
     sorted_plugins[#sorted_plugins+1] = {
       name = "reports",
-      handler = reports
+      handler = reports,
+      schema = {},
     }
   end
 
@@ -144,22 +144,18 @@ function Kong.init()
   local conf_path = pl_path.join(ngx.config.prefix(), ".kong_env")
   local config = assert(conf_loader(conf_path))
 
-  local events = Events() -- retrieve node plugins
-  local dao = assert(DAOFactory.new(config, events)) -- instanciate long-lived DAO
+  local dao = assert(DAOFactory.new(config)) -- instantiate long-lived DAO
   assert(dao:init())
-  assert(dao:run_migrations()) -- migrating in case embedded in custom nginx
+  assert(dao:are_migrations_uptodate())
 
   -- populate singletons
+  singletons.ip = ip.init(config)
   singletons.dns = dns(config)
-  singletons.loaded_plugins = assert(load_plugins(config, dao, events))
-  singletons.serf = Serf.new(config, dao)
+  singletons.loaded_plugins = assert(load_plugins(config, dao))
   singletons.dao = dao
-  singletons.events = events
   singletons.configuration = config
 
-  attach_hooks(events, require "kong.core.hooks")
-
-  assert(core.build_router())
+  assert(core.build_router(dao, "init"))
 end
 
 function Kong.init_worker()
@@ -169,7 +165,9 @@ function Kong.init_worker()
   -- seeds.
   math.randomseed()
 
+
   -- init DAO
+
 
   local ok, err = singletons.dao:init_worker()
   if not ok then
@@ -177,23 +175,15 @@ function Kong.init_worker()
     return
   end
 
+
   -- init inter-worker events
+
 
   local worker_events = require "resty.worker.events"
 
-  local handler = function(data, event, source, pid)
-    if data and data.collection == "apis" then
-      assert(core.build_router())
-
-    elseif source and source == constants.CACHE.CLUSTER then
-      singletons.events:publish(event, data)
-    end
-  end
-
-  worker_events.register(handler)
 
   local ok, err = worker_events.configure {
-    shm = "process_events", -- defined by "lua_shared_dict"
+    shm = "kong_process_events", -- defined by "lua_shared_dict"
     timeout = 5,            -- life time of event data in shm
     interval = 1,           -- poll interval (seconds)
 
@@ -205,9 +195,66 @@ function Kong.init_worker()
     return
   end
 
+
+  -- init cluster_events
+
+
+  local dao_factory   = singletons.dao
+  local configuration = singletons.configuration
+
+
+  local cluster_events, err = kong_cluster_events.new {
+    dao                     = dao_factory,
+    poll_interval           = configuration.db_update_frequency,
+    poll_offset             = configuration.db_update_propagation,
+  }
+  if not cluster_events then
+    ngx.log(ngx.CRIT, "could not create cluster_events: ", err)
+    return
+  end
+
+
+  -- init cache
+
+
+  local cache, err = kong_cache.new {
+    cluster_events    = cluster_events,
+    worker_events     = worker_events,
+    propagation_delay = configuration.db_update_propagation,
+    ttl               = configuration.db_cache_ttl,
+    neg_ttl           = configuration.db_cache_ttl,
+    resty_lock_opts   = {
+      exptime = 10,
+      timeout = 5,
+    },
+  }
+  if not cache then
+    ngx.log(ngx.CRIT, "could not create kong cache: ", err)
+    return
+  end
+
+  local ok, err = cache:get("router:version", { ttl = 0 }, function()
+    return "init"
+  end)
+  if not ok then
+    ngx.log(ngx.CRIT, "could not set router version in cache: ", err)
+    return
+  end
+
+
+  singletons.cache          = cache
+  singletons.worker_events  = worker_events
+  singletons.cluster_events = cluster_events
+
+
+  singletons.dao:set_events_handler(worker_events)
+
+
   core.init_worker.before()
 
+
   -- run plugins init_worker context
+
 
   for _, plugin in ipairs(singletons.loaded_plugins) do
     plugin.handler:init_worker()
@@ -215,7 +262,8 @@ function Kong.init_worker()
 end
 
 function Kong.ssl_certificate()
-  core.certificate.before()
+  local ctx = ngx.ctx
+  core.certificate.before(ctx)
 
   for plugin, plugin_conf in plugins_iterator(singletons.loaded_plugins, true) do
     plugin.handler:certificate(plugin_conf)
@@ -223,18 +271,23 @@ function Kong.ssl_certificate()
 end
 
 function Kong.balancer()
-  local addr = ngx.ctx.balancer_address
+  local ctx = ngx.ctx
+  local addr = ctx.balancer_address
   local tries = addr.tries
-
+  local current_try = {}
   addr.try_count = addr.try_count + 1
+  tries[addr.try_count] = current_try
+
+  core.balancer.before()
+
   if addr.try_count > 1 then
-    -- only call balancer on retry, first one is done in `core.access.before` which runs
+    -- only call balancer on retry, first one is done in `core.access.after` which runs
     -- in the ACCESS context and hence has less limitations than this BALANCER context
     -- where the retries are executed
 
     -- record failure data
-    local try = tries[addr.try_count - 1]
-    try.state, try.code = get_last_failure()
+    local previous_try = tries[addr.try_count - 1]
+    previous_try.state, previous_try.code = get_last_failure()
 
     local ok, err = balancer_execute(addr)
     if not ok then
@@ -252,10 +305,8 @@ function Kong.balancer()
     end
   end
 
-  tries[addr.try_count] = {
-    ip    = addr.ip,
-    port  = addr.port,
-  }
+  current_try.ip   = addr.ip
+  current_try.port = addr.port
 
   -- set the targets as resolved
   local ok, err = set_current_peer(addr.ip, addr.port)
@@ -273,10 +324,13 @@ function Kong.balancer()
   if not ok then
     ngx.log(ngx.ERR, "could not set upstream timeouts: ", err)
   end
+
+  core.balancer.after()
 end
 
 function Kong.rewrite()
-  core.rewrite.before()
+  local ctx = ngx.ctx
+  core.rewrite.before(ctx)
 
   -- we're just using the iterator, as in this rewrite phase no consumer nor
   -- api will have been identified, hence we'll just be executing the global
@@ -285,43 +339,66 @@ function Kong.rewrite()
     plugin.handler:rewrite(plugin_conf)
   end
 
-  core.rewrite.after()
+  core.rewrite.after(ctx)
 end
 
 function Kong.access()
-  core.access.before()
+  local ctx = ngx.ctx
+  core.access.before(ctx)
 
   for plugin, plugin_conf in plugins_iterator(singletons.loaded_plugins, true) do
     plugin.handler:access(plugin_conf)
   end
 
-  core.access.after()
+  core.access.after(ctx)
 end
 
 function Kong.header_filter()
-  core.header_filter.before()
+  local ctx = ngx.ctx
+  core.header_filter.before(ctx)
 
   for plugin, plugin_conf in plugins_iterator(singletons.loaded_plugins) do
     plugin.handler:header_filter(plugin_conf)
   end
 
-  core.header_filter.after()
+  core.header_filter.after(ctx)
 end
 
 function Kong.body_filter()
+  local ctx = ngx.ctx
   for plugin, plugin_conf in plugins_iterator(singletons.loaded_plugins) do
     plugin.handler:body_filter(plugin_conf)
   end
 
-  core.body_filter.after()
+  core.body_filter.after(ctx)
 end
 
 function Kong.log()
+  local ctx = ngx.ctx
   for plugin, plugin_conf in plugins_iterator(singletons.loaded_plugins) do
     plugin.handler:log(plugin_conf)
   end
 
-  core.log.after()
+  core.log.after(ctx)
+end
+
+function Kong.handle_error()
+  return kong_error_handlers(ngx)
+end
+
+function Kong.serve_admin_api(options)
+  options = options or {}
+
+  header["Access-Control-Allow-Origin"] = options.allow_origin or "*"
+
+  if ngx.req.get_method() == "OPTIONS" then
+    header["Access-Control-Allow-Methods"] = "GET, HEAD, PUT, PATCH, POST, DELETE"
+    header["Access-Control-Allow-Headers"] = "Content-Type"
+
+    return ngx.exit(204)
+  end
+
+  return lapis.serve("kong.api")
 end
 
 return Kong

@@ -7,6 +7,8 @@ local uuid = require("kong.tools.utils").uuid
 
 local CorrelationIdHandler = BasePlugin:extend()
 
+CorrelationIdHandler.PRIORITY = 1
+
 local worker_uuid
 local worker_counter
 
@@ -20,7 +22,7 @@ local generators = setmetatable({
   end,
   ["uuid#counter"] = function()
     worker_counter = worker_counter + 1
-    return worker_uuid.."#"..worker_counter
+    return worker_uuid .. "#" .. worker_counter
   end,
   ["tracker"] = function()
     local var = ngx.var
@@ -34,7 +36,7 @@ local generators = setmetatable({
     )
   end,
 }, { __index = function(self, generator)
-    ngx.log(ngx.ERR, "Invalid generator: "..generator)
+    ngx.log(ngx.ERR, "Invalid generator: " .. generator)
 end
 })
 

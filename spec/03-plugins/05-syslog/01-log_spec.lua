@@ -6,6 +6,8 @@ local pl_stringx = require "pl.stringx"
 describe("#ci Plugin: syslog (log)", function()
   local client, platform
   setup(function()
+    helpers.run_migrations()
+
     local api1 = assert(helpers.dao.apis:insert {
       name = "api-1",
       hosts = { "logging.com" },
@@ -71,7 +73,7 @@ describe("#ci Plugin: syslog (log)", function()
   end)
 
   local function do_test(host, expecting_same)
-    local uuid = utils.random_string()
+    local uuid = utils.uuid()
 
     local response = assert(client:send {
       method = "GET",
@@ -94,7 +96,7 @@ describe("#ci Plugin: syslog (log)", function()
         assert.not_equal(uuid, json.request.headers["sys-log-uuid"])
       end
     elseif expecting_same then
-      local _, _, stdout = assert(helpers.execute("find /var/log -type f -mmin -5 2>/dev/null | xargs grep -l "..uuid))
+      local _, _, stdout = assert(helpers.execute("find /var/log -type f -mmin -5 2>/dev/null | xargs grep -l " .. uuid))
       assert.True(#stdout > 0)
     end
   end

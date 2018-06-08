@@ -97,8 +97,8 @@ code, other repos are also under active development:
 
 - [Kong Docker](https://github.com/Mashape/docker-kong): A Dockerfile for
   running Kong in Docker.
-- [Kong Packages](https://github.com/Mashape/kong-distributions): Packaging
-  scripts for deb, rpm and osx distributions.
+- [Kong Packages](https://github.com/Mashape/kong/releases): Pre-built packages
+  for Debian, Red Hat, and OS X distributions (shipped with each release).
 - [Kong Vagrant](https://github.com/Mashape/kong-vagrant): A Vagrantfile for
   provisioning a development ready environment for Kong.
 - [Kong Homebrew](https://github.com/Mashape/homebrew-kong): Homebrew Formula
@@ -155,12 +155,14 @@ Here is a list of third-party **tools** maintained by the community:
 - [Kong image for Tutum](https://github.com/Sillelien/docker-kong)
 - [Kong-UI](https://github.com/msaraf/kong-ui): Admin UI in JavaScript
 - [Konga](https://github.com/Floby/konga-cli): CLI Admin tool in JavaScript
+- [Konga](https://pantsel.github.io/konga/): Another elegant Kong UI in Javascript
 - [Kongfig](https://github.com/mybuilder/kongfig): Declarative configuration in JavaScript
 - [Kongfig on Puppet Forge](https://forge.puppet.com/mybuilder/kongfig)
 - [Puppet recipe](https://github.com/scottefein/puppet-nyt-kong)
 - [Puppet module on Puppet Forge](https://forge.puppet.com/juniorsysadmin/kong)
 - [Python-Kong](https://pypi.python.org/pypi/python-kong/): Admin client library for Python
 - [.NET-Kong](https://www.nuget.org/packages/Kong/0.0.4): Admin client library for .NET
+- [kong-java-client](https://github.com/vaibhav-sinha/kong-java-client): Admin client library for Java
 
 ## Roadmap
 
