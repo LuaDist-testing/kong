@@ -29,9 +29,9 @@ LUA_VERSION=5.1.4
 LUAJIT_VERSION=2.0.4
 PCRE_VERSION=8.36
 LUAROCKS_VERSION=2.2.2
-OPENRESTY_VERSION=1.7.10.2rc0
+OPENRESTY_VERSION=1.7.10.2
 DNSMASQ_VERSION=2.72
-OPENSSL_VERSION=1.0.2a
+OPENSSL_VERSION=1.0.2d
 
 # Variables to be used in the build process
 PACKAGE_TYPE=""
@@ -214,6 +214,7 @@ rocks_trees = {
    { name = [[system]], root = [[${OUT}/usr/local]] }
 }
 " > $rocks_config
+
 export LUAROCKS_CONFIG=$rocks_config
 export LUA_PATH=${OUT}/usr/local/share/lua/5.1/?.lua
 
@@ -232,12 +233,19 @@ rockspec_version=${rockspec_basename#"kong-"}
 sed -i.bak s@${OUT}@@g $OUT/usr/local/bin/kong
 rm $OUT/usr/local/bin/kong.bak
 
+# Create Kong folder and default logging files
+mkdir -p $OUT/usr/local/kong/logs
+touch $OUT/usr/local/kong/logs/access.log
+touch $OUT/usr/local/kong/logs/error.log
+
 # Copy the conf to /etc/kong
 post_install_script=$(mktemp $MKTEMP_POSTSCRIPT_CONF)
 echo "#!/bin/sh
 mkdir -p /etc/kong
 cp /usr/local/lib/luarocks/rocks/kong/$rockspec_version/conf/kong.yml /etc/kong/kong.yml
-echo \"user=root\" > /etc/dnsmasq.conf" > $post_install_script
+echo \"user=root\" > /etc/dnsmasq.conf
+chmod -R 777 /usr/local/kong/
+" > $post_install_script
 
 ##############################################################
 #                      Build the package                     #

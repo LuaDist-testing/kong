@@ -57,7 +57,7 @@ function Faker:insert_from_table(entities_to_insert)
   -- Insert in order (for foreign relashionships)
   -- 1. consumers and APIs
   -- 2. credentials, which need references to inserted apis and consumers
-  for _, type in ipairs({ "api", "consumer", "basicauth_credential", "keyauth_credential", "plugin_configuration" }) do
+  for _, type in ipairs({ "api", "consumer", "plugin_configuration", "oauth2_credential", "basicauth_credential", "keyauth_credential" }) do
     if entities_to_insert[type] then
       for i, entity in ipairs(entities_to_insert[type]) do
 
@@ -74,7 +74,7 @@ function Faker:insert_from_table(entities_to_insert)
         end
 
         -- Insert in DB
-        local dao_type = type=="plugin_configuration" and "plugins_configurations" or type.."s"
+        local dao_type = type == "plugin_configuration" and "plugins_configurations" or type.."s"
         local res, err = self.dao_factory[dao_type]:insert(entity)
         if err then
           local printable_mt = require "kong.tools.printable"

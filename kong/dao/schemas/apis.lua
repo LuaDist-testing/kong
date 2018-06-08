@@ -1,6 +1,5 @@
 local url = require "socket.url"
 local stringy = require "stringy"
-local constants = require "kong.constants"
 
 local function validate_target_url(value)
   local parsed_url = url.parse(value)
@@ -25,23 +24,48 @@ local function check_public_dns_and_path(value, api_t)
     return false, "At least a 'public_dns' or a 'path' must be specified"
   end
 
-  return true
+  -- Validate wildcard public_dns
+  if public_dns then
+    local _, count = public_dns:gsub("%*", "")
+    if count > 1 then
+      return false, "Only one wildcard is allowed: "..public_dns
+    elseif count > 0 then
+      local pos = public_dns:find("%*")
+      local valid
+      if pos == 1 then
+        valid = public_dns:match("^%*%.") ~= nil
+      elseif pos == string.len(public_dns) then
+        valid = public_dns:match(".%.%*$") ~= nil
+      end
+
+      if not valid then
+        return false, "Invalid wildcard placement: "..public_dns
+      end
+    end
+  end
 end
 
 local function check_path(path, api_t)
   local valid, err = check_public_dns_and_path(path, api_t)
-  if not valid then
+  if valid == false then
     return false, err
   end
 
   if path then
-    -- Prefix with `/` for the sake of consistency
-    local has_slash = string.match(path, "^/")
-    if not has_slash then api_t.path = "/"..path end
+    path = string.gsub(path, "^/*", "")
+    path = string.gsub(path, "/*$", "")
+
+    -- Add a leading slash for the sake of consistency
+    api_t.path = "/"..path
+
     -- Check if characters are in RFC 3986 unreserved list
-    local is_alphanumeric = string.match(api_t.path, "^/[%w%.%-%_~]*/?$")
+    local is_alphanumeric = string.match(api_t.path, "^/[%w%.%-%_~%/]*$")
     if not is_alphanumeric then
-      return false, "path must only contain alphanumeric and '. -, _, ~' characters"
+      return false, "path must only contain alphanumeric and '. -, _, ~, /' characters"
+    end
+    local is_invalid = string.match(api_t.path, "//+")
+    if is_invalid then
+      return false, "path is invalid: "..api_t.path
     end
   end
 
@@ -49,13 +73,16 @@ local function check_path(path, api_t)
 end
 
 return {
-  id = { type = constants.DATABASE_TYPES.ID },
-  name = { type = "string", unique = true, queryable = true, default = function(api_t) return api_t.public_dns end },
-  public_dns = { type = "string", unique = true, queryable = true,
-                func = check_public_dns_and_path,
-                regex = "([a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)*)" },
-  path = { type = "string", queryable = true, unique = true, func = check_path },
-  strip_path = { type = "boolean" },
-  target_url = { type = "string", required = true, func = validate_target_url },
-  created_at = { type = constants.DATABASE_TYPES.TIMESTAMP }
+  name = "API",
+  primary_key = {"id"},
+  fields = {
+    id = { type = "id", dao_insert_value = true },
+    created_at = { type = "timestamp", dao_insert_value = true },
+    name = { type = "string", unique = true, queryable = true, default = function(api_t) return api_t.public_dns end },
+    public_dns = { type = "string", unique = true, queryable = true, func = check_public_dns_and_path,
+                  regex = "([a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)*)" },
+    path = { type = "string", unique = true, func = check_path },
+    strip_path = { type = "boolean" },
+    target_url = { type = "string", required = true, func = validate_target_url }
+  }
 }

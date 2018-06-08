@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "kong"
-version = "0.3.2-1"
+version = "0.4.0-1"
 supported_platforms = {"linux", "macosx"}
 -- LuaDist source
 source = {
-  tag = "0.3.2-1",
+  tag = "0.4.0-1",
   url = "git://github.com/LuaDist-testing/kong.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/Mashape/kong",
---   tag = "0.3.2"
+--   tag = "0.4.0"
 -- }
 description = {
   summary = "Kong is a scalable and customizable API Management Layer built on top of Nginx.",
@@ -33,6 +33,7 @@ dependencies = {
   "lua-cjson ~> 2.1.0-1",
   "ansicolors ~> 1.0.2-3",
   "lbase64 ~> 20120820-1",
+  "lua-resty-iputils ~> 0.2.0-1",
 
   "luasocket ~> 2.0.2-5",
   "lrexlib-pcre ~> 2.7.2-1",
@@ -52,6 +53,7 @@ build = {
 
     ["kong.cli.utils"] = "kong/cli/utils/utils.lua",
     ["kong.cli.utils.signal"] = "kong/cli/utils/signal.lua",
+    ["kong.cli.utils.input"] = "kong/cli/utils/input.lua",
     ["kong.cli.db"] = "kong/cli/db.lua",
     ["kong.cli.config"] = "kong/cli/config.lua",
     ["kong.cli.quit"] = "kong/cli/quit.lua",
@@ -89,6 +91,7 @@ build = {
     ["kong.dao.schemas.consumers"] = "kong/dao/schemas/consumers.lua",
     ["kong.dao.schemas.plugins_configurations"] = "kong/dao/schemas/plugins_configurations.lua",
     ["kong.dao.cassandra.factory"] = "kong/dao/cassandra/factory.lua",
+    ["kong.dao.cassandra.query_builder"] = "kong/dao/cassandra/query_builder.lua",
     ["kong.dao.cassandra.base_dao"] = "kong/dao/cassandra/base_dao.lua",
     ["kong.dao.cassandra.migrations"] = "kong/dao/cassandra/migrations.lua",
     ["kong.dao.cassandra.apis"] = "kong/dao/cassandra/apis.lua",
@@ -109,9 +112,14 @@ build = {
     ["kong.plugins.keyauth.api"] = "kong/plugins/keyauth/api.lua",
     ["kong.plugins.keyauth.daos"] = "kong/plugins/keyauth/daos.lua",
 
-    ["kong.plugins.oauth.handler"] = "kong/plugins/oauth/handler.lua",
-    ["kong.plugins.oauth.access"] = "kong/plugins/oauth/access.lua",
-    ["kong.plugins.oauth.schema"] = "kong/plugins/oauth/schema.lua",
+    ["kong.plugins.oauth2.handler"] = "kong/plugins/oauth2/handler.lua",
+    ["kong.plugins.oauth2.access"] = "kong/plugins/oauth2/access.lua",
+    ["kong.plugins.oauth2.schema"] = "kong/plugins/oauth2/schema.lua",
+    ["kong.plugins.oauth2.daos"] = "kong/plugins/oauth2/daos.lua",
+    ["kong.plugins.oauth2.api"] = "kong/plugins/oauth2/api.lua",
+
+    ["kong.plugins.log_serializers.basic"] = "kong/plugins/log_serializers/basic.lua",
+    ["kong.plugins.log_serializers.alf"] = "kong/plugins/log_serializers/alf.lua",
 
     ["kong.plugins.tcplog.handler"] = "kong/plugins/tcplog/handler.lua",
     ["kong.plugins.tcplog.log"] = "kong/plugins/tcplog/log.lua",
@@ -126,9 +134,12 @@ build = {
     ["kong.plugins.httplog.schema"] = "kong/plugins/httplog/schema.lua",
 
     ["kong.plugins.filelog.handler"] = "kong/plugins/filelog/handler.lua",
-    ["kong.plugins.filelog.log"] = "kong/plugins/filelog/log.lua",
     ["kong.plugins.filelog.schema"] = "kong/plugins/filelog/schema.lua",
+    ["kong.plugins.filelog.log"] = "kong/plugins/filelog/log.lua",
     ["kong.plugins.filelog.fd_util"] = "kong/plugins/filelog/fd_util.lua",
+
+    ["kong.plugins.mashape-analytics.handler"] = "kong/plugins/mashape-analytics/handler.lua",
+    ["kong.plugins.mashape-analytics.schema"] = "kong/plugins/mashape-analytics/schema.lua",
 
     ["kong.plugins.ratelimiting.handler"] = "kong/plugins/ratelimiting/handler.lua",
     ["kong.plugins.ratelimiting.access"] = "kong/plugins/ratelimiting/access.lua",
@@ -158,11 +169,18 @@ build = {
     ["kong.plugins.ssl.ssl_util"] = "kong/plugins/ssl/ssl_util.lua",
     ["kong.plugins.ssl.schema"] = "kong/plugins/ssl/schema.lua",
 
+    ["kong.plugins.ip_restriction.handler"] = "kong/plugins/ip_restriction/handler.lua",
+    ["kong.plugins.ip_restriction.init_worker"] = "kong/plugins/ip_restriction/init_worker.lua",
+    ["kong.plugins.ip_restriction.access"] = "kong/plugins/ip_restriction/access.lua",
+    ["kong.plugins.ip_restriction.schema"] = "kong/plugins/ip_restriction/schema.lua",
+
     ["kong.api.app"] = "kong/api/app.lua",
     ["kong.api.crud_helpers"] = "kong/api/crud_helpers.lua",
+    ["kong.api.route_helpers"] = "kong/api/route_helpers.lua",
     ["kong.api.routes.kong"] = "kong/api/routes/kong.lua",
     ["kong.api.routes.apis"] = "kong/api/routes/apis.lua",
     ["kong.api.routes.consumers"] = "kong/api/routes/consumers.lua",
+    ["kong.api.routes.plugins"] = "kong/api/routes/plugins.lua",
     ["kong.api.routes.plugins_configurations"] = "kong/api/routes/plugins_configurations.lua",
   },
   install = {

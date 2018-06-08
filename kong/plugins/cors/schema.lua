@@ -1,9 +1,11 @@
 return {
-  origin = { type = "string" },
-  headers = { type = "string" },
-  exposed_headers = { type = "string" },
-  methods = { type = "string" },
-  max_age = { type = "number" },
-  credentials = { type = "boolean", default = false },
-  preflight_continue = { type = "boolean", default = false }
+  fields = {
+    origin = { type = "string" },
+    headers = { type = "array" },
+    exposed_headers = { type = "array" },
+    methods = { type = "array", enum = { "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE" } },
+    max_age = { type = "number" },
+    credentials = { type = "boolean", default = false },
+    preflight_continue = { type = "boolean", default = false }
+  }
 }

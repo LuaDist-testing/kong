@@ -1,6 +1,5 @@
 local spec_helper = require "spec.spec_helpers"
 local http_client = require "kong.tools.http_client"
-local cache = require "kong.tools.database_cache"
 
 local env = spec_helper.get_env()
 
@@ -44,7 +43,7 @@ describe("Database cache", function()
     os.execute("sleep "..tonumber(5))
 
     local _, status = http_client.get(spec_helper.PROXY_URL.."/get", {}, {host = "cache.test"})
-    assert.are.equal(403, status)
+    assert.are.equal(401, status)
 
     -- Create a consumer and a key will make it work again
     local consumer, err = env.dao_factory.consumers:insert { username = "john" }

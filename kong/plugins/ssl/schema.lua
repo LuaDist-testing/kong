@@ -18,11 +18,14 @@ local function validate_key(v)
 end
 
 return {
-  cert = { required = true, type = "string", func = validate_cert },
-  key = { required = true, type = "string", func = validate_key },
-  only_https = { required = false, type = "boolean", default = false },
+  no_consumer = true,
+  fields = {
+    cert = { required = true, type = "string", func = validate_cert },
+    key = { required = true, type = "string", func = validate_key },
+    only_https = { required = false, type = "boolean", default = false },
 
-  -- Internal use
-  _cert_der_cache = { type = "string", immutable = true },
-  _key_der_cache = { type = "string", immutable = true }
+    -- Internal use
+    _cert_der_cache = { type = "string", immutable = true },
+    _key_der_cache = { type = "string", immutable = true }
+  }
 }

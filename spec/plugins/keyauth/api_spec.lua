@@ -2,7 +2,7 @@ local json = require "cjson"
 local http_client = require "kong.tools.http_client"
 local spec_helper = require "spec.spec_helpers"
 
-describe("Basic Auth Credentials API", function()
+describe("Key Auth Credentials API", function()
   local BASE_URL, credential, consumer
 
   setup(function()
@@ -33,17 +33,16 @@ describe("Basic Auth Credentials API", function()
         assert.equal(consumer.id, credential.consumer_id)
       end)
 
-      it("[FAILURE] should return proper errors", function()
-        local response, status = http_client.post(BASE_URL, {})
-        assert.equal(400, status)
-        assert.equal('{"key":"key is required"}\n', response)
+      it("[SUCCESS] should create a keyauth credential auto-generating the key", function()
+        local _, status = http_client.post(BASE_URL, {})
+        assert.equal(201, status)
       end)
 
     end)
 
     describe("PUT", function()
       setup(function()
-        spec_helper.get_env().dao_factory.keyauth_credentials:delete(credential.id)
+        spec_helper.get_env().dao_factory.keyauth_credentials:delete({id = credential.id})
       end)
 
       it("[SUCCESS] should create and update", function()
@@ -53,10 +52,9 @@ describe("Basic Auth Credentials API", function()
         assert.equal(consumer.id, credential.consumer_id)
       end)
 
-      it("[FAILURE] should return proper errors", function()
-        local response, status = http_client.put(BASE_URL, {})
-        assert.equal(400, status)
-        assert.equal('{"key":"key is required"}\n', response)
+      it("[SUCCESS] should create a keyauth credential auto-generating the key", function()
+        local _, status = http_client.put(BASE_URL, {})
+        assert.equal(201, status)
       end)
 
     end)
@@ -67,7 +65,7 @@ describe("Basic Auth Credentials API", function()
         local response, status = http_client.get(BASE_URL)
         assert.equal(200, status)
         local body = json.decode(response)
-        assert.equal(1, #(body.data))
+        assert.equal(3, #(body.data))
       end)
 
     end)

@@ -11,8 +11,10 @@ local _M = {
     HTTP_CREATED = 201,
     HTTP_NO_CONTENT = 204,
     HTTP_BAD_REQUEST = 400,
+    HTTP_UNAUTHORIZED = 401,
     HTTP_FORBIDDEN = 403,
     HTTP_NOT_FOUND = 404,
+    HTTP_METHOD_NOT_ALLOWED = 405,
     HTTP_CONFLICT = 409,
     HTTP_UNSUPPORTED_MEDIA_TYPE = 415,
     HTTP_INTERNAL_SERVER_ERROR = 500
@@ -22,14 +24,20 @@ local _M = {
 -- Define some rules that will ALWAYS be applied to some status codes.
 -- Ex: 204 must not have content, but if 404 has no content then "Not found" will be set.
 local response_default_content = {
-  [_M.status_codes.HTTP_NOT_FOUND] = function(content)
-    return content and content or "Not found"
+  [_M.status_codes.HTTP_UNAUTHORIZED] = function(content)
+    return content or "Unauthorized"
   end,
   [_M.status_codes.HTTP_NO_CONTENT] = function(content)
     return nil
   end,
+  [_M.status_codes.HTTP_NOT_FOUND] = function(content)
+    return content or "Not found"
+  end,
   [_M.status_codes.HTTP_INTERNAL_SERVER_ERROR] = function(content)
     return "An unexpected error occurred"
+  end,
+  [_M.status_codes.HTTP_METHOD_NOT_ALLOWED] = function(content)
+    return "Method not allowed"
   end
 }
 
@@ -47,15 +55,23 @@ local function send_response(status_code)
   local constants = require "kong.constants"
   local cjson = require "cjson"
 
-  return function(content, raw)
+  return function(content, raw, headers)
     if status_code >= _M.status_codes.HTTP_INTERNAL_SERVER_ERROR then
-      ngx.log(ngx.ERR, tostring(content))
+      if content then
+        ngx.log(ngx.ERR, tostring(content))
+      end
       ngx.ctx.stop_phases = true -- interrupt other phases of this request
     end
 
     ngx.status = status_code
     ngx.header["Content-Type"] = "application/json; charset=utf-8"
     ngx.header["Server"] = constants.NAME.."/"..constants.VERSION
+
+    if headers then
+      for k, v in pairs(headers) do
+        ngx.header[k] = v
+      end
+    end
 
     if type(response_default_content[status_code]) == "function" then
       content = response_default_content[status_code](content)
@@ -85,13 +101,13 @@ local closure_cache = {}
 -- Sends any status code as a response. This is useful for plugins which want to
 -- send a response when the status code is not defined in `_M.status_codes` and thus
 -- has no sugar method on `_M`.
-function _M.send(status_code, content, raw)
+function _M.send(status_code, content, raw, headers)
   local res = closure_cache[status_code]
   if not res then
     res = send_response(status_code)
     closure_cache[status_code] = res
   end
-  return res(content, raw)
+  return res(content, raw, headers)
 end
 
 return _M

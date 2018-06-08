@@ -1,5 +1,7 @@
 local validations = require "kong.dao.schemas_validation"
 local crud = require "kong.api.crud_helpers"
+local syslog = require "kong.tools.syslog"
+local constants = require "kong.constants"
 
 return {
   ["/apis/"] = {
@@ -24,12 +26,11 @@ return {
     end,
 
     PATCH = function(self, dao_factory)
-      self.params.id = self.api.id
-      crud.patch(self.params, dao_factory.apis)
+      crud.patch(self.params, self.api, dao_factory.apis)
     end,
 
     DELETE = function(self, dao_factory)
-      crud.delete(self.api.id, dao_factory.apis)
+      crud.delete(self.api, dao_factory.apis)
     end
   },
 
@@ -44,7 +45,12 @@ return {
     end,
 
     POST = function(self, dao_factory, helpers)
-      crud.post(self.params, dao_factory.plugins_configurations)
+      crud.post(self.params, dao_factory.plugins_configurations, function(data)
+        if configuration.send_anonymous_reports then
+          data.signal = constants.SYSLOG.API
+          syslog.log(syslog.format_entity(data))
+        end
+      end)
     end,
 
     PUT = function(self, dao_factory, helpers)
@@ -79,12 +85,11 @@ return {
     end,
 
     PATCH = function(self, dao_factory, helpers)
-      self.params.id = self.plugin.id
-      crud.patch(self.params, dao_factory.plugins_configurations)
+      crud.patch(self.params, self.plugin, dao_factory.plugins_configurations)
     end,
 
     DELETE = function(self, dao_factory)
-      crud.delete(self.plugin.id, dao_factory.plugins_configurations)
+      crud.delete(self.plugin, dao_factory.plugins_configurations)
     end
   }
 }

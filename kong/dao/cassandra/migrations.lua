@@ -1,10 +1,12 @@
 local cassandra = require "cassandra"
+local stringy = require "stringy"
 local BaseDao = require "kong.dao.cassandra.base_dao"
 
 local Migrations = BaseDao:extend()
 
 function Migrations:new(properties)
-  self._queries = {
+  self._table = "schema_migrations"
+  self.queries = {
     add_migration = [[
       UPDATE schema_migrations SET migrations = migrations + ? WHERE id = 'migrations';
     ]],
@@ -27,7 +29,7 @@ end
 -- @return query result
 -- @return error if any
 function Migrations:add_migration(migration_name)
-  return Migrations.super._execute(self, self._queries.add_migration,
+  return Migrations.super._execute(self, self.queries.add_migration,
     { cassandra.list({ migration_name }) })
 end
 
@@ -37,7 +39,7 @@ end
 function Migrations:get_migrations()
   local rows, err
 
-  rows, err = Migrations.super._execute(self, self._queries.get_keyspace,
+  rows, err = Migrations.super._execute(self, self.queries.get_keyspace,
     { self._properties.keyspace }, nil, "system")
   if err then
     return nil, err
@@ -46,8 +48,10 @@ function Migrations:get_migrations()
     return nil
   end
 
-  rows, err = Migrations.super._execute(self, self._queries.get_migrations)
-  if err then
+  rows, err = Migrations.super._execute(self, self.queries.get_migrations)
+  if err and stringy.find(err.message, "unconfigured columnfamily schema_migrations") ~= nil then
+    return nil, "Missing mandatory column family \"schema_migrations\" in configured keyspace. Please consider running \"kong migrations reset\" to fix this."
+  elseif err then
     return nil, err
   elseif rows and #rows > 0 then
     return rows[1].migrations
@@ -58,8 +62,19 @@ end
 -- @return query result
 -- @return error if any
 function Migrations:delete_migration(migration_name)
-  return Migrations.super._execute(self, self._queries.delete_migration,
+  return Migrations.super._execute(self, self.queries.delete_migration,
     { cassandra.list({ migration_name }) })
 end
 
-return Migrations
+-- Drop the entire keyspace
+-- @param `keyspace` Name of the keyspace to drop
+-- @return query result
+function Migrations:drop_keyspace(keyspace)
+  return Migrations.super._execute(self, string.format("DROP keyspace \"%s\"", keyspace))
+end
+
+function Migrations:drop()
+  -- never drop this
+end
+
+return { migrations = Migrations }

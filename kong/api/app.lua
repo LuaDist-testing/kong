@@ -5,6 +5,13 @@ local responses = require "kong.tools.responses"
 local app_helpers = require "lapis.application"
 local app = lapis.Application()
 
+-- Parses a form value, handling multipart/data values
+-- @param `v` The value object
+-- @return The parsed value
+local function parse_value(v)
+  return type(v) == "table" and v.content or v -- Handle multipart
+end
+
 -- Put nested keys in objects:
 -- Normalize dotted keys in objects.
 -- Example: {["key.value.sub"]=1234} becomes {key = {value = {sub=1234}}
@@ -42,9 +49,9 @@ local function normalize_nested_params(obj)
     -- normalize sub-keys with dot notation
     local keys = stringy.split(k, ".")
     if #keys > 1 then -- we have a key containing a dot
-      attach_dotted_key(keys, new_obj, v)
+      attach_dotted_key(keys, new_obj, parse_value(v))
     else
-      new_obj[k] = v -- nothing special with that key, simply attaching the value
+      new_obj[k] = parse_value(v) -- nothing special with that key, simply attaching the value
     end
   end
 
@@ -100,23 +107,14 @@ app.handle_404 = function(self)
 end
 
 app.handle_error = function(self, err, trace)
-  ngx.log(ngx.ERR, err.."\n"..trace)
-
-  local iterator, iter_err = ngx.re.gmatch(err, ".+:\\d+:\\s*(.+)")
-  if iter_err then
-    ngx.log(ngx.ERR, iter_err)
-  end
-
-  local m, iter_err = iterator()
-  if iter_err then
-    ngx.log(ngx.ERR, iter_err)
-  end
-
-  if m and table.getn(m) > 0 then
-    return responses.send_HTTP_INTERNAL_SERVER_ERROR(m[1])
+  if stringy.find(err, "don't know how to respond to") ~= nil then
+    return responses.send_HTTP_METHOD_NOT_ALLOWED()
   else
-    return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
+    ngx.log(ngx.ERR, err.."\n"..trace)
   end
+
+  -- We just logged the error so no need to give it to responses and log it twice
+  return responses.send_HTTP_INTERNAL_SERVER_ERROR()
 end
 
 local handler_helpers = {
@@ -141,7 +139,8 @@ local function attach_routes(routes)
   end
 end
 
-for _, v in ipairs({"kong", "apis", "consumers", "plugins_configurations"}) do
+-- Load core routes
+for _, v in ipairs({"kong", "apis", "consumers", "plugins", "plugins_configurations"}) do
   local routes = require("kong.api.routes."..v)
   attach_routes(routes)
 end

@@ -1,4 +1,4 @@
-local VERSION = "0.3.2"
+local VERSION = "0.4.0"
 
 return {
   NAME = "kong",
@@ -22,10 +22,6 @@ return {
     DATABASE = "database",
     UNIQUE = "unique",
     FOREIGN = "foreign"
-  },
-  DATABASE_TYPES = {
-    ID = "id",
-    TIMESTAMP = "timestamp"
   },
   -- Non standard headers, specific to Kong
   HEADERS = {

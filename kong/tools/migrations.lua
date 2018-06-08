@@ -7,6 +7,8 @@ local Migrations = Object:extend()
 function Migrations:new(dao, migrations_path)
   local path = migrations_path and migrations_path or "."
 
+  dao:load_daos(require("kong.dao.cassandra.migrations"))
+
   self.dao = dao
   self.options = { keyspace = dao._properties.keyspace }
   self.migrations_path = IO.path:join(path, "database", "migrations")
@@ -16,7 +18,7 @@ end
 
 -- Createa migration interface for each database available
 function Migrations:create(configuration, name, callback)
-  for k, _ in pairs(configuration.databases_available) do
+  for k in pairs(configuration.databases_available) do
     local date_str = os.date("%Y-%m-%d-%H%M%S")
     local file_path = IO.path:join(self.migrations_path, k)
     local file_name = date_str.."_"..name
@@ -50,6 +52,10 @@ return Migration
   end
 end
 
+function Migrations:get_migrations()
+  return self.dao.migrations:get_migrations()
+end
+
 -- Execute all migrations UP
 -- @param callback A function to execute on each migration (ie: for logging)
 function Migrations:migrate(callback)
@@ -81,7 +87,11 @@ function Migrations:migrate(callback)
   -- Execute all new migrations, in order
   for _, file_path in ipairs(diff_migrations) do
     -- Load our migration script
-    local migration = loadfile(file_path)()
+    local migration_file = loadfile(file_path)
+    if not migration_file then
+      error("Migration failed: cannot load file at "..file_path)
+    end
+    local migration = migration_file()
 
     -- Generate UP query from string + options
     local up_query = migration.up(self.options)
@@ -141,20 +151,6 @@ function Migrations:rollback(callback)
   end
 
   callback(migration_to_rollback)
-end
-
--- Execute all migrations DOWN
--- @param {function} callback A function to execute on each migration (ie: for logging)
-function Migrations:reset(callback)
-  local done = false
-  while not done do
-    self:rollback(function(migration, err)
-      if not migration and not err then
-        done = true
-      end
-      callback(migration, err)
-    end)
-  end
 end
 
 return Migrations

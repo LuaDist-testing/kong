@@ -5,12 +5,13 @@
 [![Gitter Badge][gitter-badge]][gitter-url]
 
 - Website: [getkong.org][kong-url]
+- Website Repo: [github.com/getkong.org][kong-website] 
 - Docs: [getkong.org/docs][kong-docs]
 - Mailing List: [Google Groups][google-groups-url]
 
 [![][kong-logo]][kong-url]
 
-Kong was created to secure, manage and extend Microservices & APIs. Kong is powered by the battle-tested tech of NGINX and Cassandra with a focus on scalability, high performance & reliability. Kong runs in production at [Mashape][mashape-url] handling billions of requests to over ten thousand APIs.
+Kong was created to secure, manage and extend Microservices & APIs. Kong is powered by the battle-tested tech of **NGINX** and Cassandra with a focus on scalability, high performance & reliability. Kong runs in production at [Mashape][mashape-url] handling billions of requests to over ten thousand APIs.
 
 ## Core Features
 
@@ -44,29 +45,32 @@ Over two minutes **117,185** requests with an average latency of **10ms** at **9
 
 ## Development
 
-1. Clone the repository and make it your working directory.
-2. Run `[sudo] make install`
+1. [Download](http://getkong.org/download/) the latest released version of Kong, and install it on your development machine. This will install all the required dependencies.
+
+2. Clone the repository and make it your working directory.
+
+3. Run `[sudo] make install`
 
   This will build and install the `kong` luarock globally.
 
-3. Delete the `/etc/kong` folder: `[sudo] rm -rf /etc/kong`
+4. Delete the `/etc/kong` folder: `[sudo] rm -rf /etc/kong`
 
   This is necessary just in case you have previously installed Kong with a package distribution.
 
-4. Run `make dev`
+5. Run `make dev`
 
   This will install development dependencies and create your environment configuration files:
 
   - `kong_TESTS.yml`
   - `kong_DEVELOPMENT.yml`
 
-5. Run the tests:
+6. Run the tests:
 
   ```bash
   make test-all
   ```
 
-6. Run Kong with the development configuration file:
+7. Run Kong with the development configuration file:
 
    ```bash
    $ kong start -c kong_DEVELOPMENT.yml
@@ -101,13 +105,14 @@ Complete & versioned documentation is available at [GetKong.org][kong-url]:
 - [API Reference](http://getkong.org/docs/latest/admin-api)
 
 [kong-url]: http://getkong.org/
+[kong-website]: https://github.com/Mashape/getkong.org
 [kong-docs]: http://getkong.org/docs/
 
 [kong-contrib]: https://github.com/Mashape/kong/blob/master/CONTRIBUTING.md
 [kong-changelog]: https://github.com/Mashape/kong/blob/master/CHANGELOG.md
 
 [kong-logo]: http://i.imgur.com/4jyQQAZ.png
-[kong-benefits]: http://i.imgur.com/2hg4orF.png
+[kong-benefits]: http://cl.ly/image/1B3J3b3h1H1c/Image%202015-07-07%20at%206.57.25%20PM.png
 
 [mashape-url]: https://www.mashape.com
 
