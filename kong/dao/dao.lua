@@ -102,13 +102,11 @@ end
 --- Insert a row.
 -- Insert a given Lua table as a row in the related table.
 -- @param[type=table] tbl Table to insert as a row.
--- @param[type=table] options Options to use for this insertion. (`ttl`: Time-to-live for this row, in seconds, `quiet`: does not send event)
+-- @param[type=table] options Options to use for this insertion. (`ttl`: Time-to-live for this row, in seconds)
 -- @treturn table res A table representing the insert row (with fields created during the insertion).
 -- @treturn table err If an error occured, a table describing the issue.
 function DAO:insert(tbl, options)
-  options = options or {}
   check_arg(tbl, 1, "table")
-  check_arg(options, 2, "table")
 
   local model = self.model_mt(tbl)
   local ok, err = model:validate {dao = self}
@@ -126,7 +124,7 @@ function DAO:insert(tbl, options)
   end
 
   local res, err = self.db:insert(self.table, self.schema, model, self.constraints, options)
-  if not err and not options.quiet then
+  if not err then
     event(self, event_types.ENTITY_CREATED, self.table, self.schema, res)
   end
   return ret_error(self.db.db_type, res, err)
@@ -251,16 +249,15 @@ end
 -- with the one specified in `tbl` at once.
 -- @param[type=table] tbl A table containing the new values for this row.
 -- @param[type=table] filter_keys A table which must contain the primary key(s) to select the row to be updated.
--- @param[type=table] options Options to use for this update. (`full`: performs a full update of the entity, `quiet`: does not send event).
+-- @param[type=table] options Options to use for this update. (`full`: performs a full update of the entity).
 -- @treturn table res A table representing the updated entity.
 -- @treturn table err If an error occured, a table describing the issue.
 function DAO:update(tbl, filter_keys, options)
-  options = options or {}
   check_arg(tbl, 1, "table")
   check_not_empty(tbl, 1)
   check_arg(filter_keys, 2, "table")
   check_not_empty(filter_keys, 2)
-  check_arg(options, 3, "table")
+  options = options or {}
 
   for k, v in pairs(filter_keys) do
     if tbl[k] == nil then
@@ -294,9 +291,7 @@ function DAO:update(tbl, filter_keys, options)
   if err then
     return ret_error(self.db.db_type, nil, err)
   elseif res then
-    if not options.quiet then
-      event(self, event_types.ENTITY_UPDATED, self.table, self.schema, old)
-    end
+    event(self, event_types.ENTITY_UPDATED, self.table, self.schema, old)
     return setmetatable(res, nil)
   end
 end
@@ -309,10 +304,8 @@ end
 -- @param[type=table] tbl A table containing the primary key field(s) for this row.
 -- @treturn table row A table representing the deleted row
 -- @treturn table err If an error occured, a table describing the issue.
-function DAO:delete(tbl, options)
-  options = options or {}
+function DAO:delete(tbl)
   check_arg(tbl, 1, "table")
-  check_arg(options, 2, "table")
 
   local model = self.model_mt(tbl)
   if not model:has_primary_keys() then
@@ -341,7 +334,7 @@ function DAO:delete(tbl, options)
   end
 
   local row, err = self.db:delete(self.table, self.schema, primary_keys, self.constraints)
-  if not err and row ~= nil and not options.quiet then
+  if not err and row ~= nil then
     event(self, event_types.ENTITY_DELETED, self.table, self.schema, row)
 
     -- Also propagate the deletion for the associated entities

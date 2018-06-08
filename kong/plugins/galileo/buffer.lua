@@ -33,7 +33,7 @@ local min = math.min
 local pow = math.pow
 local now = ngx.now
 local ERR = ngx.ERR
-local DEBUG = ngx.DEBUG
+local DEBUG = ngx.INFO
 local WARN = ngx.WARN
 
 local _buffer_max_mb = 200

@@ -1,6 +1,5 @@
 local utils = require "kong.tools.utils"
 local singletons = require "kong.singletons"
-local conf_loader = require "kong.conf_loader"
 
 local find = string.find
 local pairs = pairs
@@ -43,7 +42,7 @@ return {
           enabled_in_cluster = distinct_plugins
         },
         lua_version = lua_version,
-        configuration = conf_loader.remove_sensitive(singletons.configuration)
+        configuration = singletons.configuration
       }
     end
   },
