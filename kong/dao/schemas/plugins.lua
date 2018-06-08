@@ -19,34 +19,56 @@ return {
   clustering_key = {"name"},
   fields = {
     id = {
-        type = "id",
-        dao_insert_value = true },
+      type = "id",
+      dao_insert_value = true
+    },
     created_at = {
-        type = "timestamp",
-        dao_insert_value = true },
+      type = "timestamp",
+      immutable = true,
+      dao_insert_value = true
+    },
     api_id = {
-        type = "id",
-        required = true,
-        foreign = "apis:id",
-        queryable = true },
+      type = "id",
+      required = true,
+      foreign = "apis:id",
+      queryable = true
+    },
     consumer_id = {
-        type = "id",
-        foreign = "consumers:id",
-        queryable = true,
-        default = constants.DATABASE_NULL_ID },
+      type = "id",
+      foreign = "consumers:id",
+      queryable = true,
+      default = constants.DATABASE_NULL_ID
+    },
     name = {
-        type = "string",
-        required = true,
-        immutable = true,
-        queryable = true },
+      type = "string",
+      required = true,
+      immutable = true,
+      queryable = true
+    },
     config = {
-        type = "table",
-        schema = load_config_schema,
-        default = {} },
+      type = "table",
+      schema = load_config_schema,
+      default = {}
+    },
     enabled = {
-        type = "boolean",
-        default = true }
+      type = "boolean",
+      default = true
+    }
   },
+  marshall_event = function(self, plugin_t)
+    if plugin_t and plugin_t.config then
+      local config_schema, err = self.fields.config.schema(plugin_t)
+      if err then
+        return false, DaoError(err, constants.DATABASE_ERROR_TYPES.SCHEMA)
+      end
+
+      if config_schema.marshall_event and type(config_schema.marshall_event) == "function" then
+        plugin_t.config = config_schema.marshall_event(plugin_t.config)
+      end
+    end
+    
+    return plugin_t
+  end,
   self_check = function(self, plugin_t, dao, is_update)
     -- Load the config schema
     local config_schema, err = self.fields.config.schema(plugin_t)

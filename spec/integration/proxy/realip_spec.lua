@@ -8,7 +8,6 @@ local IO = require "kong.tools.io"
 local FILE_LOG_PATH = os.tmpname()
 
 describe("Real IP", function()
-
   setup(function()
     spec_helper.prepare_db()
     spec_helper.insert_fixtures {
@@ -31,17 +30,20 @@ describe("Real IP", function()
     local uuid = utils.random_string()
 
     -- Making the request
-    local _ = http_client.get(spec_helper.STUB_GET_URL, nil,
+    http_client.get(spec_helper.STUB_GET_URL, nil,
       {
         host = "realip.com",
         ["X-Forwarded-For"] = "4.4.4.4, 1.1.1.1, 5.5.5.5",
         file_log_uuid = uuid
       }
     )
-    --assert.are.equal(200, status)
 
+    local timeout = 10
     while not (IO.file_exists(FILE_LOG_PATH) and IO.file_size(FILE_LOG_PATH) > 0) do
       -- Wait for the file to be created, and for the log to be appended
+      os.execute("sleep 1")
+      timeout = timeout -1
+      if timeout == 0 then error("Retrieving the ip address timed out") end
     end
 
     local file_log = IO.read_file(FILE_LOG_PATH)
@@ -51,5 +53,4 @@ describe("Real IP", function()
 
     os.remove(FILE_LOG_PATH)
   end)
-
 end)

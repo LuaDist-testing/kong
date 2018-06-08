@@ -1,7 +1,7 @@
 -- ALF serializer module.
 -- ALF is the format supported by Mashape Analytics (http://apianalytics.com)
 --
--- This module represents _one_ ALF, zhich has _one_ ALF entry.
+-- This module represents _one_ ALF, which has _one_ ALF entry.
 -- It used to be a representation of one ALF with several entries, but ALF
 -- had its `clientIPAddress` moved to the root level of ALF, hence breaking
 -- this implementation.
@@ -15,7 +15,15 @@
 -- - Nginx lua module documentation: http://wiki.nginx.org/HttpLuaModule
 -- - ngx_http_core_module: http://wiki.nginx.org/HttpCoreModule#.24http_HEADER
 
-local stringy = require "stringy"
+local type = type
+local pairs = pairs
+local ipairs = ipairs
+local os_date = os.date
+local tostring = tostring
+local tonumber = tonumber
+local string_len = string.len
+local table_insert = table.insert
+local ngx_encode_base64 = ngx.encode_base64
 
 local EMPTY_ARRAY_PLACEHOLDER = "__empty_array_placeholder__"
 
@@ -38,7 +46,7 @@ local function dic_to_array(hash, fn)
     for _, val in ipairs(v) do
       k = tostring(k)
       val = tostring(val)
-      table.insert(arr, {name = k, value = val})
+      table_insert(arr, {name = k, value = val})
       fn(k, val)
     end
   end
@@ -48,6 +56,26 @@ local function dic_to_array(hash, fn)
   else
     return {EMPTY_ARRAY_PLACEHOLDER}
   end
+end
+
+--- Get a header from nginx's headers
+-- Make sure that is multiple headers of a same name are present,
+-- we only want the last one. Also include a default value if
+-- no header is present.
+-- @param `headers` ngx's request or response headers table.
+-- @param `name`    Name of the desired header to retrieve.
+-- @param `default` String returned in case no header is found.
+-- @return `header` The header value (a string) or the default, or nil.
+local function get_header(headers, name, default)
+  local val = headers[name]
+  if val ~= nil then
+    if type(val) == "table" then
+      val = val[#val]
+    end
+    return val
+  end
+
+  return default
 end
 
 local _M = {}
@@ -67,30 +95,14 @@ function _M.serialize_entry(ngx)
   local alf_res_body = analytics_data.res_body or ""
   local alf_req_post_args = analytics_data.req_post_args or {}
 
+  local alf_base64_req_body = ngx_encode_base64(alf_req_body)
+  local alf_base64_res_body = ngx_encode_base64(alf_res_body)
+
   -- timers
-  local proxy_started_at, proxy_ended_at = ngx.ctx.proxy_started_at, ngx.ctx.proxy_ended_at
-
-  local alf_started_at = ngx.req.start_time()
-
-  -- First byte sent to upstream - first byte received from client
-  local alf_send_time = proxy_started_at - alf_started_at * 1000
-
-  -- Time waiting for the upstream response
-  local upstream_response_time = 0
-  local upstream_response_times = ngx.var.upstream_response_time
-  if not upstream_response_times or upstream_response_times == "-" then
-    -- client aborted the request
-    return
-  end
-
-  upstream_response_times = stringy.split(upstream_response_times, ", ")
-  for _, val in ipairs(upstream_response_times) do
-    upstream_response_time = upstream_response_time + val
-  end
-  local alf_wait_time = upstream_response_time * 1000
-
-  -- upstream response fully received - upstream response 1 byte received
-  local alf_receive_time = analytics_data.response_received and analytics_data.response_received - proxy_ended_at or -1
+  -- @see core.handler for their definition
+  local alf_send_time = ngx.ctx.KONG_PROXY_LATENCY or -1
+  local alf_wait_time = ngx.ctx.KONG_WAITING_TIME or -1
+  local alf_receive_time = ngx.ctx.KONG_RECEIVE_TIME or -1
 
   -- Compute the total time. If some properties were unavailable
   -- (because the proxying was aborted), then don't add the value.
@@ -108,15 +120,15 @@ function _M.serialize_entry(ngx)
 
   local alf_req_headers_arr = dic_to_array(req_headers, function(k, v) req_headers_str = req_headers_str..k..v end)
   local alf_res_headers_arr = dic_to_array(res_headers, function(k, v) res_headers_str = res_headers_str..k..v end)
-  local alf_req_headers_size = string.len(req_headers_str)
-  local alf_res_headers_size = string.len(res_headers_str)
+  local alf_req_headers_size = string_len(req_headers_str)
+  local alf_res_headers_size = string_len(res_headers_str)
 
   -- mimeType, defaulting to "application/octet-stream"
-  local alf_req_mimeType = req_headers["Content-Type"] and req_headers["Content-Type"] or "application/octet-stream"
-  local alf_res_mimeType = res_headers["Content-Type"] and res_headers["Content-Type"] or "application/octet-stream"
+  local alf_req_mimeType = get_header(req_headers, "Content-Type", "application/octet-stream")
+  local alf_res_mimeType = get_header(res_headers, "Content-Type", "application/octet-stream")
 
   return {
-    startedDateTime = os.date("!%Y-%m-%dT%TZ", alf_started_at),
+    startedDateTime = os_date("!%Y-%m-%dT%TZ", ngx.req.start_time()),
     time = alf_time,
     request = {
       method = ngx.req.get_method(),
@@ -126,11 +138,11 @@ function _M.serialize_entry(ngx)
       headers = alf_req_headers_arr,
       headersSize = alf_req_headers_size,
       cookies = {EMPTY_ARRAY_PLACEHOLDER},
-      bodySize = string.len(alf_req_body),
+      bodySize = string_len(alf_req_body),
       postData = {
         mimeType = alf_req_mimeType,
         params = dic_to_array(alf_req_post_args),
-        text = alf_req_body
+        text = alf_base64_req_body
       }
     },
     response = {
@@ -145,7 +157,7 @@ function _M.serialize_entry(ngx)
       content = {
         size = tonumber(ngx.var.body_bytes_sent),
         mimeType = alf_res_mimeType,
-        text = alf_res_body
+        text = alf_base64_res_body
       }
     },
     cache = {},
@@ -182,8 +194,8 @@ function _M.new_alf(ngx, token, environment)
       log = {
         version = "1.2",
         creator = {
-          name = "mashape-analytics-agent-kong",
-          version = "1.0.2"
+          name = "galileo-agent-kong",
+          version = "1.1.0"
         },
         entries = {_M.serialize_entry(ngx)}
       }

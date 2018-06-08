@@ -102,14 +102,10 @@ local function validate_signature(request, hmac_params, headers)
   end
 end
 
-local function hmacauth_credential_key(username)
-  return "hmacauth_credentials/"..username
-end
-
 local function load_credential(username)
   local credential
   if username then
-      credential = cache.get_or_set(hmacauth_credential_key(username), function()
+      credential = cache.get_or_set(cache.hmacauth_credential_key(username), function()
       local keys, err = dao.hmacauth_credentials:find_by_keys { username = username }
       local result
       if err then
@@ -145,7 +141,6 @@ function _M.execute(conf)
   local headers = ngx_set_headers();
   -- If both headers are missing, return 401
   if not (headers[AUTHORIZATION] or headers[PROXY_AUTHORIZATION]) then
-    ngx.ctx.stop_phases = true
     return responses.send_HTTP_UNAUTHORIZED()
   end
 
@@ -171,7 +166,6 @@ function _M.execute(conf)
   end
   hmac_params.secret = credential.secret
   if not validate_signature(ngx.req, hmac_params, headers) then
-    ngx.ctx.stop_phases = true -- interrupt other phases of this request
     return responses.send_HTTP_FORBIDDEN("HMAC signature does not match")
   end
 

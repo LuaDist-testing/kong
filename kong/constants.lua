@@ -1,4 +1,4 @@
-local VERSION = "0.5.3"
+local VERSION = "0.6.0"
 
 return {
   NAME = "kong",
@@ -11,9 +11,7 @@ return {
   },
   CLI = {
     GLOBAL_KONG_CONF = "/etc/kong/kong.yml",
-    NGINX_CONFIG = "nginx.conf",
-    NGINX_PID = "kong.pid",
-    DNSMASQ_PID = "dnsmasq.pid",
+    NGINX_CONFIG = "nginx.conf"
   },
   DATABASE_NULL_ID = "00000000-0000-0000-0000-000000000000",
   DATABASE_ERROR_TYPES = setmetatable ({
@@ -30,11 +28,18 @@ return {
                     return val
                  end
               }),
+  PLUGINS_AVAILABLE = {
+    "ssl", "jwt", "acl", "cors", "oauth2", "tcp-log", "udp-log", "file-log",
+    "http-log", "key-auth", "hmac-auth", "basic-auth", "ip-restriction",
+    "mashape-analytics", "request-transformer", "response-transformer",
+    "request-size-limiting", "rate-limiting", "response-ratelimiting", "syslog",
+    "loggly", "datadog"
+  },
   -- Non standard headers, specific to Kong
   HEADERS = {
     HOST_OVERRIDE = "X-Host-Override",
-    PROXY_TIME = "X-Kong-Proxy-Time",
-    API_TIME = "X-Kong-Api-Time",
+    PROXY_LATENCY = "X-Kong-Proxy-Latency",
+    UPSTREAM_LATENCY = "X-Kong-Upstream-Latency",
     CONSUMER_ID = "X-Consumer-ID",
     CONSUMER_CUSTOM_ID = "X-Consumer-Custom-ID",
     CONSUMER_USERNAME = "X-Consumer-Username",

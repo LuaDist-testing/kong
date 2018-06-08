@@ -1,11 +1,11 @@
 local spec_helper = require "spec.spec_helpers"
-local uuid = require "uuid"
+local uuid = require "lua_uuid"
 
 local env = spec_helper.get_env()
 local dao_factory = env.dao_factory
 local faker = env.faker
 
-describe("DAO key-auth Credentials", function()
+describe("key-auth credentials DAO", function()
 
   setup(function()
     spec_helper.prepare_db()

@@ -1,10 +1,10 @@
-local uuid = require "uuid"
+local uuid = require "lua_uuid"
 local Faker = require "kong.tools.faker"
 local DaoError = require "kong.dao.error"
 
 describe("Faker", function()
 
-  local ENTITIES_TYPES = { "api", "consumer", "plugin" }
+  local ENTITIES_TYPES = { "api", "consumer", "plugin", "node" }
 
   local factory_mock = {}
   local insert_spy

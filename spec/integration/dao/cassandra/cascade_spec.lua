@@ -6,11 +6,9 @@ local dao_factory = env.dao_factory
 dao_factory:load_plugins({"keyauth", "basicauth", "oauth2"})
 
 describe("Cassandra cascade delete", function()
-
   setup(function()
     spec_helper.prepare_db()
   end)
-
   describe("API -> plugins", function()
     local api, untouched_api
 
@@ -34,11 +32,9 @@ describe("Cassandra cascade delete", function()
       api = fixtures.api[1]
       untouched_api = fixtures.api[2]
     end)
-
     teardown(function()
       spec_helper.drop_db()
     end)
-
     it("should delete foreign plugins when deleting an API", function()
       local ok, err = dao_factory.apis:delete(api)
       assert.falsy(err)
@@ -84,11 +80,9 @@ describe("Cassandra cascade delete", function()
       consumer = fixtures.consumer[1]
       untouched_consumer = fixtures.consumer[2]
     end)
-
     teardown(function()
       spec_helper.drop_db()
     end)
-
     it("should delete foreign plugins when deleting a Consumer", function()
       local ok, err = dao_factory.consumers:delete(consumer)
       assert.falsy(err)
@@ -126,15 +120,13 @@ describe("Cassandra cascade delete", function()
       consumer = fixtures.consumer[1]
       untouched_consumer = fixtures.consumer[2]
     end)
-
     teardown(function()
       spec_helper.drop_db()
     end)
-
     it("should delete foreign keyauth_credentials when deleting a Consumer", function()
-      local ok, err = dao_factory.consumers:delete(consumer)
+      local res, err = dao_factory.consumers:delete(consumer)
       assert.falsy(err)
-      assert.True(ok)
+      assert.truthy(res)
 
       local results, err = dao_factory.keyauth_credentials:find_by_keys {
         consumer_id = consumer.id
@@ -167,11 +159,9 @@ describe("Cassandra cascade delete", function()
       consumer = fixtures.consumer[1]
       untouched_consumer = fixtures.consumer[2]
     end)
-
     teardown(function()
       spec_helper.drop_db()
     end)
-
     it("should delete foreign basicauth_credentials when deleting a Consumer", function()
       local ok, err = dao_factory.consumers:delete(consumer)
       assert.falsy(err)
@@ -225,11 +215,9 @@ describe("Cassandra cascade delete", function()
       }
       assert.falsy(err)
     end)
-
     teardown(function()
       spec_helper.drop_db()
     end)
-
     it("should delete foreign oauth2_credentials and tokens when deleting a Consumer", function()
       local ok, err = dao_factory.consumers:delete(consumer)
       assert.falsy(err)

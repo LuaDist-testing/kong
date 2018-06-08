@@ -14,7 +14,7 @@ describe("Responses", function()
     ngx.header = {}
     -- Revert mocked functions
     for _, v in pairs(ngx) do
-      if type(v) == "table" and v.revert then
+      if type(v) == "table" and type(v.revert) == "function" then
         v:revert()
       end
     end
@@ -65,14 +65,12 @@ describe("Responses", function()
     end
   end)
 
-  it("should call `ngx.log` and set `stop_phases` if and only if a 500 status code range was given", function()
+  it("should call `ngx.log` if and only if a 500 status code range was given", function()
     responses.send_HTTP_BAD_REQUEST()
     assert.stub(ngx.log).was_not_called()
-    assert.falsy(ngx.ctx.stop_phases)
 
     responses.send_HTTP_INTERNAL_SERVER_ERROR()
     assert.stub(ngx.log).was_not_called()
-    assert.True(ngx.ctx.stop_phases)
 
     responses.send_HTTP_INTERNAL_SERVER_ERROR("error")
     assert.stub(ngx.log).was_called()

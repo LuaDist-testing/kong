@@ -18,7 +18,9 @@ describe("OAuth 2 Credentials API", function()
 
     setup(function()
       local fixtures = spec_helper.insert_fixtures {
-        consumer = {{ username = "bob" }}
+        consumer = {
+          {username = "bob"}
+        }
       }
       consumer = fixtures.consumer[1]
       BASE_URL = spec_helper.API_URL.."/consumers/bob/oauth2/"
@@ -27,7 +29,7 @@ describe("OAuth 2 Credentials API", function()
     describe("POST", function()
 
       it("[SUCCESS] should create a oauth2 credential", function()
-        local response, status = http_client.post(BASE_URL, { name = "Test APP", redirect_uri = "http://google.com/" })
+        local response, status = http_client.post(BASE_URL, {name = "Test APP", redirect_uri = "http://google.com/"})
         assert.equal(201, status)
         credential = json.decode(response)
         assert.equal(consumer.id, credential.consumer_id)
@@ -43,11 +45,11 @@ describe("OAuth 2 Credentials API", function()
 
     describe("PUT", function()
       setup(function()
-        spec_helper.get_env().dao_factory.keyauth_credentials:delete({id=credential.id})
+        spec_helper.get_env().dao_factory.keyauth_credentials:delete({id = credential.id})
       end)
 
       it("[SUCCESS] should create and update", function()
-        local response, status = http_client.put(BASE_URL, { redirect_uri = "http://google.com/", name = "Test APP" })
+        local response, status = http_client.put(BASE_URL, {redirect_uri = "http://google.com/", name = "Test APP"})
         assert.equal(201, status)
         credential = json.decode(response)
         assert.equal(consumer.id, credential.consumer_id)
@@ -89,14 +91,14 @@ describe("OAuth 2 Credentials API", function()
     describe("PATCH", function()
 
       it("[SUCCESS] should update a credential", function()
-        local response, status = http_client.patch(BASE_URL..credential.id, { redirect_uri = "http://getkong.org/" })
+        local response, status = http_client.patch(BASE_URL..credential.id, {redirect_uri = "http://getkong.org/"})
         assert.equal(200, status)
         credential = json.decode(response)
         assert.equal("http://getkong.org/", credential.redirect_uri)
       end)
 
       it("[FAILURE] should return proper errors", function()
-        local response, status = http_client.patch(BASE_URL..credential.id, { redirect_uri = "" })
+        local response, status = http_client.patch(BASE_URL..credential.id, {redirect_uri = ""})
         assert.equal(400, status)
         assert.equal('{"redirect_uri":"redirect_uri is not a url"}\n', response)
       end)
@@ -116,6 +118,58 @@ describe("OAuth 2 Credentials API", function()
       it("[SUCCESS] should delete a credential", function()
         local _, status = http_client.delete(BASE_URL..credential.id)
         assert.equal(204, status)
+      end)
+
+    end)
+
+  end)
+
+  describe("/oauth2_tokens/", function()
+
+    -- Create credential
+    local response, status = http_client.post(BASE_URL, {name = "Test APP", redirect_uri = "http://google.com/"})
+    assert.equal(201, status)
+    credential = json.decode(response)
+
+    local token
+
+    BASE_URL = spec_helper.API_URL.."/oauth2_tokens/"
+
+    describe("POST", function()
+
+      it("[SUCCESS] should create a oauth2 token", function()
+        local response, status = http_client.post(BASE_URL, {credential_id = credential.id, expires_in = 10})
+        assert.equal(201, status)
+        token = json.decode(response)
+        assert.equal(credential.id, token.credential_id)
+        assert.equal(10, token.expires_in)
+        assert.truthy(token.access_token)
+        assert.truthy(token.refresh_token)
+        assert.equal("bearer", token.token_type)
+      end)
+
+      it("[FAILURE] should return proper errors", function()
+        local response, status = http_client.post(BASE_URL, {})
+        assert.equal(400, status)
+        assert.equal('{"credential_id":"credential_id is required","expires_in":"expires_in is required"}\n', response)
+      end)
+
+    end)
+
+    describe("GET", function()
+
+      it("should retrieve by id", function()
+        local response, status = http_client.get(BASE_URL..token.id)
+        assert.equal(200, status)
+        local body = json.decode(response)
+        assert.equals(credential.id, body.credential_id)
+      end)
+
+      it("should retrieve all", function()
+        local response, status = http_client.get(BASE_URL)
+        assert.equal(200, status)
+        local body = json.decode(response)
+        assert.equals(1, body.total)
       end)
 
     end)
