@@ -4,6 +4,7 @@ local cjson = require "cjson"
 local crypto = require "crypto"
 local base64 = require "base64"
 
+local PROXY_URL = spec_helper.PROXY_URL
 local STUB_GET_URL = spec_helper.STUB_GET_URL
 local STUB_POST_URL = spec_helper.STUB_POST_URL
 local hmac_sha1_binary = function(secret, data)
@@ -18,13 +19,15 @@ describe("Authentication Plugin", function()
     spec_helper.prepare_db()
     spec_helper.insert_fixtures {
       api = {
-        {name = "tests-hmac-auth", request_host = "hmacauth.com", upstream_url = "http://mockbin.org/"}
+        {name = "tests-hmac-auth", request_host = "hmacauth.com", upstream_url = "http://mockbin.org/"},
+        {name = "tests-hmac-auth2", request_host = "hmacauth2.com", upstream_url = "http://httpbin.org/"}
       },
       consumer = {
         {username = "hmacauth_tests_consuser"}
       },
       plugin = {
-        {name = "hmac-auth", config = {clock_skew = 3000}, __api = 1}
+        {name = "hmac-auth", config = {clock_skew = 3000}, __api = 1},
+        {name = "hmac-auth", config = {clock_skew = 3000}, __api = 2}
       },
       hmacauth_credential = {
         {username = "bob", secret = "secret", __consumer = 1}
@@ -174,11 +177,115 @@ describe("Authentication Plugin", function()
     it("should pass with GET with request-line", function()
       local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
       local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
-      local hmacAuth = [["hmac username="bob",  algorithm="hmac-sha1",   headers="date content-md5 request-line",signature="]]..encodedSignature..[["]]
+      local hmacAuth = [["hmac username="bob",  algorithm="hmac-sha1",   headers="date content-md5 request-line", signature="]]..encodedSignature..[["]]
       local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
       assert.equal(200, status)
       local parsed_response = cjson.decode(response)
       assert.equal("hello", parsed_response.headers["authorization"])
     end)
+    
+    it("should not pass with GET with wrong username", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bobb",  algorithm="hmac-sha1",   headers="date content-md5 request-line", signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      local body = cjson.decode(response)
+      assert.equal(403, status)
+      assert.equal(SIGNATURE_NOT_VALID, body.message)
+    end)
+    
+    it("should not pass with GET with username blank", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="",  algorithm="hmac-sha1",   headers="date content-md5 request-line", signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      local body = cjson.decode(response)
+      assert.equal(403, status)
+      assert.equal(SIGNATURE_NOT_VALID, body.message)
+    end)
+    
+    it("should not pass with GET with username missing", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac algorithm="hmac-sha1",   headers="date content-md5 request-line", signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      local body = cjson.decode(response)
+      assert.equal(403, status)
+      assert.equal(SIGNATURE_NOT_VALID, body.message)
+    end)
+    
+    it("should not pass with GET with wrong hmac headers field name", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bob",  algorithm="hmac-sha1",   header="date content-md5 request-line", signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      local body = cjson.decode(response)
+      assert.equal(403, status)
+      assert.equal(SIGNATURE_NOT_VALID, body.message)
+    end)
+    
+     it("should not pass with GET with wrong hmac signature field name", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bob",  algorithm="hmac-sha1",   headers="date content-md5 request-line", signatures="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      local body = cjson.decode(response)
+      assert.equal(403, status)
+      assert.equal(SIGNATURE_NOT_VALID, body.message)
+    end)
+    
+    it("should not pass with GET with malformed hmac signature field", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bob",  algorithm="hmac-sha1" headers="date content-md5 request-line",signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      local body = cjson.decode(response)
+      assert.equal(403, status)
+      assert.equal(SIGNATURE_NOT_VALID, body.message)
+    end)
+    
+    it("should not pass with GET with malformed hmac headers field", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bob",  algorithm="hmac-sha1" headers="  date content-md5 request-line",signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      local body = cjson.decode(response)
+      assert.equal(403, status)
+      assert.equal(SIGNATURE_NOT_VALID, body.message)
+    end)
+    
+    it("should pass with GET with no space or space between hmac signatures fields", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bob",algorithm="hmac-sha1",  headers="date content-md5 request-line",signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      assert.equal(200, status)
+      local parsed_response = cjson.decode(response)
+      assert.equal("hello", parsed_response.headers["authorization"])
+    end)
+    
+    it("should pass with GET with wrong algorithm", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /request? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bob",algorithm="hmac-sha256",  headers="date content-md5 request-line",signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(STUB_GET_URL, {}, {host = "hmacauth.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      assert.equal(200, status)
+      local parsed_response = cjson.decode(response)
+      assert.equal("hello", parsed_response.headers["authorization"])
+    end)
+
+    it("should pass the right headers to the upstream server", function()
+      local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+      local encodedSignature = base64.encode(hmac_sha1_binary("secret", "date: "..date.."\n".."content-md5: md5".."\nGET /headers? HTTP/1.1"))
+      local hmacAuth = [["hmac username="bob",algorithm="hmac-sha256",  headers="date content-md5 request-line",signature="]]..encodedSignature..[["]]
+      local response, status = http_client.get(PROXY_URL.."/headers", {}, {host = "hmacauth2.com",  date = date, ["proxy-authorization"] = hmacAuth, authorization = "hello", ["content-md5"] = "md5"})
+      assert.equal(200, status)
+      local parsed_response = cjson.decode(response)
+      assert.truthy(parsed_response.headers["X-Consumer-Id"])
+      assert.truthy(parsed_response.headers["X-Consumer-Username"])
+      assert.truthy(parsed_response.headers["X-Credential-Username"])
+      assert.equal("bob", parsed_response.headers["X-Credential-Username"])
+    end)
+
   end)
 end)

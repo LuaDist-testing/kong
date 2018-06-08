@@ -1,5 +1,6 @@
 local spec_helper = require "spec.spec_helpers"
 local http_client = require "kong.tools.http_client"
+local constants = require "kong.constants"
 local cjson = require "cjson"
 
 local PROXY_URL = spec_helper.PROXY_URL
@@ -10,13 +11,15 @@ describe("Authentication Plugin", function()
     spec_helper.prepare_db()
     spec_helper.insert_fixtures {
       api = {
-        {name = "tests-basicauth", request_host = "basicauth.com", upstream_url = "http://httpbin.org"}
+        {name = "tests-basicauth", request_host = "basicauth.com", upstream_url = "http://httpbin.org"},
+        {name = "tests-basicauth2", request_host = "basicauth2.com", upstream_url = "http://httpbin.org"}
       },
       consumer = {
         {username = "basicauth_tests_consuser"}
       },
       plugin = {
-        {name = "basic-auth", config = {}, __api = 1}
+        {name = "basic-auth", config = {}, __api = 1},
+        {name = "basic-auth", config = { hide_credentials = true }, __api = 2}
       },
       basicauth_credential = {
         {username = "username", password = "password", __consumer = 1}
@@ -32,10 +35,11 @@ describe("Authentication Plugin", function()
 
   describe("Basic Authentication", function()
 
-    it("should return invalid credentials when the credential is missing", function()
-      local response, status = http_client.get(PROXY_URL.."/get", {}, {host = "basicauth.com"})
+    it("should return invalid credentials and www-authenticate header when the credential is missing", function()
+      local response, status, headers = http_client.get(PROXY_URL.."/get", {}, {host = "basicauth.com"})
       local body = cjson.decode(response)
       assert.equal(401, status)
+      assert.equal(headers["www-authenticate"], "Basic realm=\""..constants.NAME.."\"")
       assert.equal("Unauthorized", body.message)
     end)
 
@@ -67,10 +71,11 @@ describe("Authentication Plugin", function()
       assert.equal("Invalid authentication credentials", body.message)
     end)
 
-    it("should reply 401 when authorization is missing", function()
-      local response, status = http_client.get(PROXY_URL.."/get", {}, {host = "basicauth.com", authorization123 = "Basic dXNlcm5hbWU6cGFzc3dvcmQ="})
+    it("should reply 401 and www-authenticate header when authorization is missing", function()
+      local response, status, headers = http_client.get(PROXY_URL.."/get", {}, {host = "basicauth.com", authorization123 = "Basic dXNlcm5hbWU6cGFzc3dvcmQ="})
       local body = cjson.decode(response)
       assert.equal(401, status)
+      assert.equal(headers["www-authenticate"], "Basic realm=\""..constants.NAME.."\"")
       assert.equal("Unauthorized", body.message)
     end)
 
@@ -110,5 +115,33 @@ describe("Authentication Plugin", function()
       assert.equal("Basic dXNlcm5hbWU6cGFzc3dvcmQ=", parsed_response.headers["Proxy-Authorization"])
     end)
 
+    it("should pass the right headers to the upstream server", function()
+      local response, status = http_client.get(PROXY_URL.."/headers", {}, {host = "basicauth.com", authorization = "hello", ["authorization"] = "Basic dXNlcm5hbWU6cGFzc3dvcmQ="})
+      assert.equal(200, status)
+      local parsed_response = cjson.decode(response)
+      assert.truthy(parsed_response.headers["X-Consumer-Id"])
+      assert.truthy(parsed_response.headers["X-Consumer-Username"])
+      assert.truthy(parsed_response.headers["X-Credential-Username"])
+      assert.equal("username", parsed_response.headers["X-Credential-Username"])
+    end)
+
   end)
+
+  describe("Hide credentials", function()
+
+      it("should pass with POST and hide credentials in Authorization header", function()
+        local response, status = http_client.get(PROXY_URL.."/headers", {}, {host = "basicauth2.com", authorization = "Basic dXNlcm5hbWU6cGFzc3dvcmQ="})
+        assert.equal(200, status)
+        local parsed_response = cjson.decode(response)
+        assert.falsy(parsed_response.headers.Authorization)
+      end)
+
+      it("should pass with POST and hide credentials in Proxy-Authorization header", function()
+        local response, status = http_client.get(PROXY_URL.."/headers", {}, {host = "basicauth2.com",["proxy-authorization"] = "Basic dXNlcm5hbWU6cGFzc3dvcmQ="})
+        assert.equal(200, status)
+        local parsed_response = cjson.decode(response)
+        assert.falsy(parsed_response.headers["Proxy-Authorization"])
+      end)
+
+    end)
 end)

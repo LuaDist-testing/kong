@@ -85,6 +85,7 @@ function _M.execute(conf)
   -- If both headers are missing, return 401
   if not (ngx.req.get_headers()[AUTHORIZATION] or ngx.req.get_headers()[PROXY_AUTHORIZATION]) then
     ngx.ctx.stop_phases = true
+    ngx.header["WWW-Authenticate"] = "Basic realm=\""..constants.NAME.."\""
     return responses.send_HTTP_UNAUTHORIZED()
   end
 
@@ -117,6 +118,7 @@ function _M.execute(conf)
   ngx.req.set_header(constants.HEADERS.CONSUMER_ID, consumer.id)
   ngx.req.set_header(constants.HEADERS.CONSUMER_CUSTOM_ID, consumer.custom_id)
   ngx.req.set_header(constants.HEADERS.CONSUMER_USERNAME, consumer.username)
+  ngx.req.set_header(constants.HEADERS.CREDENTIAL_USERNAME, credential.username)
   ngx.ctx.authenticated_entity = credential
 end
 

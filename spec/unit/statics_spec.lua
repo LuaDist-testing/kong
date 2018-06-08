@@ -186,6 +186,7 @@ nginx: |
 
       ssl_certificate {{ssl_cert}};
       ssl_certificate_key {{ssl_key}};
+      ssl_protocols TLSv1 TLSv1.1 TLSv1.2;# omit SSLv3 because of POODLE (CVE-2014-3566)
 
       location / {
         default_type 'text/plain';
@@ -238,6 +239,7 @@ nginx: |
           ngx.header["Access-Control-Allow-Origin"] = "*"
           if ngx.req.get_method() == "OPTIONS" then
             ngx.header["Access-Control-Allow-Methods"] = "GET,HEAD,PUT,PATCH,POST,DELETE"
+            ngx.header["Access-Control-Allow-Headers"] = "Content-Type"
             ngx.exit(204)
           end
           local lapis = require "lapis"
